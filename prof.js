@@ -186,8 +186,10 @@
     try {
       await api('POST', `/api/sessions/${session.code}/${nom}`, { token: session.token });
       await rafraichir();
+      return true;
     } catch (err) {
-      toast(err.message);
+      toast(err.message === 'Failed to fetch' ? 'Serveur injoignable, réessaie.' : err.message);
+      return false;
     }
   }
 
@@ -244,6 +246,7 @@
     $('pCode').textContent = session.code;
     $('pProjectionCode').textContent = session.code;
     await rafraichir();
+    if (g !== generation) return; // un autre ouvrir()/fermer() est passé pendant ce temps : il gère son propre minuteur
     minuteur = setInterval(rafraichir, INTERVALLE);
   }
 
@@ -253,8 +256,8 @@
   };
   $('pTerminer').onclick = async () => {
     if (!confirm('Terminer la session ? Les élèves encore en jeu seront arrêtés.')) return;
-    await action('terminer');
-    oublierSession();
+    // on n'oublie la session que si le serveur l'a vraiment terminée (sinon le prof pourrait la perdre en direct)
+    if (await action('terminer')) oublierSession();
   };
   $('pNouvelle').onclick = () => ouvrir(base, { toast, nouvelle: true });
   $('pCopier').onclick = async () => {

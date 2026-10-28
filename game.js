@@ -14,11 +14,30 @@
     document.body.appendChild(alerte);
   }
 
+  // Données du jeu : celles enregistrées par l'admin (serveur) si elles existent, sinon le fichier Excel
+  const VALEUR = { O: 1, N: -1 };
+  async function donneesAdmin() {
+    try {
+      const r = await fetch('/api/donnees', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return null;
+      const { donnees } = await r.json();
+      if (!donnees) return null;
+      return { metiers: donnees.metiers, questions: donnees.questions.map((q) => ({
+        ...q, profils: Object.fromEntries(Object.entries(q.profils).map(([m, v]) => [m, VALEUR[v] || 0])) })) };
+    } catch (err) { // pas de serveur (site statique, hors ligne…) : on prend l'Excel
+      console.warn('[ORIENTech] données enregistrées indisponibles, lecture du fichier Excel', err);
+      return null;
+    }
+  }
+
   let base;
   try {
-    const reponse = await fetch('data/orientech.xlsx', { cache: 'no-store' });
-    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-    base = Moteur.lireClasseur(XLSX, XLSX.read(await reponse.arrayBuffer()));
+    base = await donneesAdmin();
+    if (!base) {
+      const reponse = await fetch('data/orientech.xlsx', { cache: 'no-store' });
+      if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+      base = Moteur.lireClasseur(XLSX, XLSX.read(await reponse.arrayBuffer()));
+    }
     if (!base.questions.length || !Object.keys(base.metiers).length) throw new Error('aucune question ou aucun métier dans le fichier');
   } catch (err) {
     return erreurChargement(err);
@@ -30,6 +49,8 @@
   const contexte = { profil: null, mode: null, prenom: null, code: null, eleve: null }; // choix faits avant la partie
   let journal = [];      // réponses de la partie en cours (pour le suivi prof)
   let attenteProf = null; // minuteur de la salle d'attente élève
+  let jetonSalle = 0;     // change à chaque entrée en salle d'attente : une ancienne vérification en cours est ignorée
+  let repondable = false; // la question affichée attend encore sa réponse
   let depuisFiches = false; // la fiche résultat a été ouverte depuis le catalogue (et non à la fin d'une partie)
   let retourFiche = 'fiches'; // écran où ramène le bouton du bas d'une fiche consultée (catalogue ou admin)
   // écrans où le bouton en haut à droite devient ✕ (retour accueil) ; ailleurs il ouvre toutes les fiches métiers
@@ -37,7 +58,7 @@
 
   function show(name) {
     ecran = name;
-    if (name !== 'salle') { clearInterval(attenteProf); attenteProf = null; }
+    if (name !== 'salle') { clearTimeout(attenteProf); attenteProf = null; }
     document.querySelectorAll('[data-screen]').forEach((el) => el.classList.toggle('active', el.dataset.screen === name));
     $('progress').classList.toggle('hidden', name !== 'question');
     $('progress').classList.toggle('flex', name === 'question');
@@ -81,9 +102,13 @@
     $('questionBadge').lastElementChild.textContent = bonus ? `Question bonus ${bonus.faites + 1} / ${bonus.total}` : `Question ${partie.nbPosees() + 1}`;
     renderStars(partie.nbPosees() ? partie.confiance() : 0);
     show('question');
+    repondable = true;
   }
 
   function answer(oui) {
+    // une seule réponse par question : un 2e appui (Entrée/Espace au clavier, double clic) est ignoré
+    if (!repondable || ecran !== 'question') return;
+    repondable = false;
     partie.repondre(current.id, oui);
     journal.push({ texte: current.texte, oui });
     if (partie.estFinie()) {
@@ -111,8 +136,10 @@
   function signaler(metierFinal) {
     const e = contexte.eleve;
     if (!e || !partie) return;
+    e.seq = (e.seq || 0) + 1; // numéro d'envoi : le serveur ignore un envoi plus ancien arrivé en retard
     api('POST', `/api/sessions/${e.code}/eleves/${e.id}/progression`, {
       token: e.token,
+      seq: e.seq,
       nbQuestions: partie.nbPosees(),
       confiance: partie.nbPosees() ? partie.confiance() : 0,
       top3: partie.classement().slice(0, 3),
@@ -128,19 +155,26 @@
     $('salleMessage').textContent = `C'est noté, ${contexte.prenom} !`;
     show('salle');
     const e = contexte.eleve;
+    // une vérification à la fois (la suivante part 2 s après la réponse) et seulement tant que l'élève est dans CETTE salle
+    const jeton = ++jetonSalle;
+    const encore = () => ecran === 'salle' && jeton === jetonSalle;
     let echecs = 0;
-    attenteProf = setInterval(async () => {
+    async function verifier() {
+      if (!encore()) return;
       try {
         const { phase } = await api('GET', `/api/sessions/${e.code}/eleves/${e.id}?token=${encodeURIComponent(e.token)}`);
+        if (!encore()) return; // l'élève a quitté la salle pendant la requête
         if (echecs >= 3) toast('Connexion rétablie');
         echecs = 0;
-        if (phase === 'direct') { toast("C'est parti !"); start(); }
-        if (phase === 'termine') { toast('La session a été terminée par ton prof.'); goHome(); }
+        if (phase === 'direct') { toast("C'est parti !"); return start(); }
+        if (phase === 'termine') { toast('La session a été terminée par ton prof.'); return goHome(); }
       } catch (err) { // on réessaie au prochain tour, mais on prévient si ça dure
         console.warn('[ORIENTech] salle d\'attente : serveur injoignable', err);
         if (++echecs === 3) toast('Connexion perdue… nouvel essai en cours');
       }
-    }, 2000);
+      if (encore()) attenteProf = setTimeout(verifier, 2000);
+    }
+    attenteProf = setTimeout(verifier, 2000);
   }
 
   let metierPropose = null;    // métier affiché à la fin de la partie
@@ -356,13 +390,23 @@
     if (!/^[A-Z0-9]{6}$/.test(code)) return erreurCode('Le code fait 6 caractères (lettres et chiffres).');
     let reponse;
     try {
-      reponse = await api('POST', `/api/sessions/${code}/eleves`, { prenom });
+      // déjà inscrit dans cette classe sous ce prénom (retour en arrière puis « Rejoindre ») : on reprend l'inscription
+      // au lieu d'en créer une 2e, qui laisserait une carte fantôme chez le prof
+      const deja = contexte.eleve;
+      if (deja && deja.code === code && contexte.prenom === prenom) {
+        try {
+          const { phase } = await api('GET', `/api/sessions/${code}/eleves/${deja.id}?token=${encodeURIComponent(deja.token)}`);
+          reponse = { ...deja, phase };
+        } catch (err) { /* inscription expirée : on se réinscrit ci-dessous */ }
+      }
+      if (!reponse) reponse = await api('POST', `/api/sessions/${code}/eleves`, { prenom });
     } catch (err) {
       return erreurCode(err.message === 'Failed to fetch' ? 'Impossible de joindre le serveur.' : err.message);
     }
+    if (reponse.phase === 'termine') return erreurCode('Cette session est terminée.');
     contexte.prenom = prenom;
     contexte.code = code;
-    contexte.eleve = { code, id: reponse.id, token: reponse.token };
+    contexte.eleve = { code, id: reponse.id, token: reponse.token, seq: reponse.seq || 0 };
     if (reponse.phase === 'attente') return attendreLancement();
     toast(`Salut ${prenom} ! Classe ${code} rejointe`);
     start();

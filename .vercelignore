@@ -5,6 +5,10 @@
 # Serveur local (non utilisé sur Vercel : l'API en ligne est api/router.js)
 serveur.py
 data/sessions.json
+data/donnees.json
+data/contributions.json
+data/*.tmp
+data/*.corrompu-*
 
 # Sources de la CSS (seul tailwind.css, déjà généré, est servi)
 tailwind.config.js

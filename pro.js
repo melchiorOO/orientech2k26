@@ -207,10 +207,14 @@
     };
   }
 
-  // TODO backend : POST vers serveur.py (ex. /api/contributions) puis ajout de la colonne dans la matrice
+  // Envoi au serveur : la proposition attend la validation de l'admin (onglet « Propositions des pros »)
   async function envoyerContribution(contribution) {
-    console.info('[ORIENTech] contribution professionnelle (non envoyée : backend à brancher)', contribution);
-    return { ok: true };
+    const r = await fetch('/api/contributions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contribution)
+    });
+    const donnees = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(donnees.erreur || `Erreur ${r.status}`);
+    return donnees;
   }
 
   $('proEnvoyer').onclick = async () => {
@@ -220,12 +224,13 @@
     $('proEnvoyer').disabled = true;
     try {
       await envoyerContribution(contribution);
-    } catch (err) {
+    } catch (err) { // le brouillon est conservé : rien n'est perdu
+      console.warn('[ORIENTech] envoi de la fiche pro impossible', err);
       $('proEnvoyer').disabled = false;
-      return opts.toast("L'envoi a échoué, réessaie.");
+      return opts.toast(err.message === 'Failed to fetch' ? "Serveur injoignable, réessaie." : `L'envoi a échoué : ${err.message}`);
     }
     dernierEnvoi = contribution;
-    $('proMerciTxt').textContent = `« ${contribution.metier.nom} » · ${n} réponses ajoutées à la matrice`;
+    $('proMerciTxt').textContent = `« ${contribution.metier.nom} » · ${n} réponses envoyées. L'équipe la valide avant de l'ajouter au jeu.`;
     etat = { champs: {}, bacs: [], competences: [], reponses: {} };
     oublier();
     opts.show('proMerci');

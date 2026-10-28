@@ -8,8 +8,12 @@ build/
 .env.*
 .vercel/
 
-# Données de sessions écrites par serveur.py en local
+# Données écrites par serveur.py en local (sessions, contenu admin, propositions des pros)
 data/sessions.json
+data/donnees.json
+data/contributions.json
+data/*.tmp
+data/*.corrompu-*
 
 # Python
 __pycache__/

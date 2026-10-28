@@ -52,6 +52,7 @@
     if (onglet === 'fiches') { rendreListeFiches(); rendreFiche(); }
     if (onglet === 'noeuds') { rendreListeNoeuds(); rendreNoeud(); }
     if (onglet === 'matrice') rendreMatrice();
+    if (onglet === 'contributions') chargerContributions();
   }
   document.querySelectorAll('[data-onglet]').forEach((b) => (b.onclick = () => changerOnglet(b.dataset.onglet)));
 
@@ -314,11 +315,122 @@
     opts.toast('Export téléchargé');
   };
 
-  // TODO backend : POST vers serveur.py (ex. /api/admin/matrice) puis mise à jour du fichier de données
-  $('aEnregistrer').onclick = () => {
-    console.info('[ORIENTech] enregistrement admin (non envoyé : backend à brancher)', exportJSON());
-    opts.toast('Enregistrement pas encore branché : utilise « Exporter »');
+  // ---------- Serveur (mot de passe demandé une fois, gardé le temps de l'onglet du navigateur)
+
+  const CLE_MDP = 'orientech-admin-mdp';
+  const lireMdp = () => { try { return sessionStorage.getItem(CLE_MDP); } catch (e) { return null; } };
+  const garderMdp = (m) => { try { m ? sessionStorage.setItem(CLE_MDP, m) : sessionStorage.removeItem(CLE_MDP); } catch (e) { /* stockage refusé */ } };
+
+  function demanderMdp() {
+    const dlg = $('aMdpDialog');
+    $('aMdpInput').value = '';
+    return new Promise((resolve) => {
+      dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok' ? $('aMdpInput').value : null), { once: true });
+      dlg.showModal();
+    });
+  }
+
+  async function appelAdmin(methode, url, corps) {
+    const mdp = lireMdp() || (await demanderMdp());
+    if (!mdp) throw new Error('Mot de passe requis');
+    const r = await fetch(url, {
+      method: methode,
+      headers: { 'X-Admin': mdp, ...(corps ? { 'Content-Type': 'application/json' } : {}) },
+      body: corps ? JSON.stringify(corps) : undefined
+    });
+    const donnees = await r.json().catch(() => ({}));
+    if (r.status === 403) garderMdp(null); // mauvais mot de passe : on le redemandera
+    if (!r.ok) throw new Error(donnees.erreur || `Erreur ${r.status}`);
+    garderMdp(mdp);
+    return donnees;
+  }
+  const messageErreur = (err) => (err.message === 'Failed to fetch' ? 'Serveur injoignable' : err.message);
+
+  $('aEnregistrer').onclick = async () => {
+    const { exporte, ...donnees } = exportJSON();
+    try {
+      const r = await appelAdmin('POST', '/api/admin/donnees', donnees);
+      original = clone({ metiers: base.metiers, questions: base.questions });
+      remettreEtat();
+      opts.toast(`Enregistré : ${r.metiers} métiers, ${r.questions} questions, visibles par tous`);
+    } catch (err) {
+      console.warn('[ORIENTech] enregistrement admin impossible', err);
+      opts.toast(`Non enregistré : ${messageErreur(err)}`);
+    }
   };
+
+  $('aReinitialiser').onclick = async () => {
+    if (!confirm("Supprimer les données enregistrées ? Le jeu relira le fichier Excel (data/orientech.xlsx) pour tout le monde.")) return;
+    try {
+      await appelAdmin('POST', '/api/admin/donnees/reinitialiser');
+      modifie = false; // rechargement voulu : pas d'alerte « modifications non enregistrées »
+      location.reload();
+    } catch (err) {
+      opts.toast(`Impossible : ${messageErreur(err)}`);
+    }
+  };
+
+  // ---------- Propositions des pros
+
+  let contributions = [];
+  const STATUTS = { attente: ['En attente', 'bg-[#FFE600] text-black'], acceptee: ['Ajoutée', 'bg-[#00FF9D] text-black'], rejetee: ['Rejetée', 'bg-white/10 text-white/60'] };
+
+  async function chargerContributions() {
+    $('aContributions').innerHTML = '<p class="text-sm font-bold text-white/60">Chargement…</p>';
+    try {
+      contributions = (await appelAdmin('GET', '/api/admin/contributions')).contributions;
+      rendreContributions();
+    } catch (err) {
+      $('aContributions').innerHTML = `<p class="text-sm font-bold text-[#FFE600]">Impossible de lire les propositions : ${esc(messageErreur(err))}</p>`;
+    }
+  }
+  $('aRechargerContrib').onclick = chargerContributions;
+
+  function rendreContributions() {
+    if (!contributions.length) {
+      $('aContributions').innerHTML = '<p class="text-sm font-bold text-white/60">Aucune proposition pour l\'instant.</p>';
+      return;
+    }
+    $('aContributions').innerHTML = contributions.map((c) => {
+      const [libelle, couleur] = STATUTS[c.statut] || STATUTS.attente;
+      const qui = [c.contributeur.prenom, c.contributeur.entreprise].filter(Boolean).join(' · ') || 'anonyme';
+      return `<div class="flex flex-wrap items-center gap-3 bg-[#321250] border-[2.5px] border-black rounded-xl p-3 ${c.statut === 'rejetee' ? 'opacity-60' : ''}">
+        <div class="flex-1 min-w-[12rem]">
+          <p class="font-lucky uppercase text-[#FFE600]">${esc(c.metier.nom)}</p>
+          <p class="text-xs font-bold text-white/70">${esc(c.metier.famille || 'Sans famille')} · ${Object.keys(c.reponses).length} réponses · ${esc(qui)} · ${new Date(c.date * 1000).toLocaleDateString('fr-FR')}</p>
+        </div>
+        <span class="text-[10px] font-lucky uppercase px-2 py-0.5 rounded border-2 border-black ${couleur}">${libelle}</span>
+        <button type="button" data-voir="${esc(c.id)}" class="admin-btn bg-[#00E5FF]"><span class="material-symbols-outlined text-base">visibility</span>Fiche</button>
+        ${c.statut !== 'acceptee' ? `<button type="button" data-ajouter="${esc(c.id)}" class="admin-btn bg-[#00FF9D]"><span class="material-symbols-outlined text-base">add</span>Ajouter au jeu</button>` : ''}
+        ${c.statut === 'attente' ? `<button type="button" data-rejeter="${esc(c.id)}" class="admin-btn bg-[#FF2A85] !text-white">Rejeter</button>` : ''}
+      </div>`;
+    }).join('');
+    const parId = (id) => contributions.find((c) => c.id === id);
+    $('aContributions').querySelectorAll('[data-voir]').forEach((b) => (b.onclick = () => opts.voirFiche(parId(b.dataset.voir).metier)));
+    $('aContributions').querySelectorAll('[data-ajouter]').forEach((b) => (b.onclick = () => ajouterAuJeu(parId(b.dataset.ajouter))));
+    $('aContributions').querySelectorAll('[data-rejeter]').forEach((b) => (b.onclick = () => changerStatut(parId(b.dataset.rejeter), 'rejetee')));
+  }
+
+  async function changerStatut(c, statut) {
+    try {
+      await appelAdmin('POST', `/api/admin/contributions/${encodeURIComponent(c.id)}`, { statut });
+      c.statut = statut;
+      rendreContributions();
+    } catch (err) {
+      opts.toast(`Impossible : ${messageErreur(err)}`);
+    }
+  }
+
+  // Le métier proposé devient une colonne de la matrice : O → 1, N → -1, questions non choisies → ? (0)
+  async function ajouterAuJeu(c) {
+    const id = ('P' + c.id).slice(0, 12);
+    if (base.metiers[id]) return opts.toast('Ce métier est déjà dans le jeu');
+    base.metiers[id] = clone(c.metier);
+    base.questions.forEach((q) => (q.profils[id] = c.reponses[q.id] === 'O' ? 1 : c.reponses[q.id] === 'N' ? -1 : 0));
+    marquer();
+    await changerStatut(c, 'acceptee');
+    opts.toast(`« ${c.metier.nom} » ajouté : clique sur Enregistrer pour le publier`);
+  }
 
   // options : { toast, voirFiche(metier), onglet? }
   function ouvrir(b, options) {
@@ -327,7 +439,7 @@
     if (!original) original = clone({ metiers: b.metiers, questions: b.questions });
     if (!base.metiers[ficheSel]) ficheSel = idsMetiers()[0] || null;
     if (!noeud(noeudSel)) noeudSel = base.questions[0] ? base.questions[0].id : null;
-    changerOnglet(['fiches', 'noeuds', 'matrice'].includes(options.onglet) ? options.onglet : onglet);
+    changerOnglet(['fiches', 'noeuds', 'matrice', 'contributions'].includes(options.onglet) ? options.onglet : onglet);
   }
 
   racine.Admin = { ouvrir };

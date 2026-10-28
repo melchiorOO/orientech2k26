@@ -25,7 +25,7 @@ admin.js          page admin
 api/router.js     API des sessions de classe (fonction Vercel + Redis Upstash)
 serveur.py        même API en local (Python, sans dépendance), pour jouer sans Internet
 data/orientech.xlsx  les données du jeu (questions, matrice, fiches métiers)
-avatars/          avatars PNG détourés
+avatars/          avatars détourés (WebP, fond transparent)
 ```
 
 Pour changer les questions ou les métiers : remplacer `data/orientech.xlsx` (même structure que `MELCHIOR_Orien_Tech_V6.xlsx`).
@@ -58,3 +58,17 @@ KV_REST_API_TOKEN   jeton d'accès à cette base
 ```
 
 (`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` fonctionnent aussi.) Sans elles, tout le jeu marche sauf le mode classe.
+
+### Mot de passe admin
+
+L'enregistrement admin (fiches + matrice) et la lecture des propositions des pros demandent un mot de passe, `ADMIN_MOT_DE_PASSE` :
+
+```bash
+npx vercel env add ADMIN_MOT_DE_PASSE production   # en ligne (puis redéployer)
+```
+
+En local, `serveur.py` le lit dans la variable d'environnement `ADMIN_MOT_DE_PASSE`, sinon dans `.env.local` (ligne `ADMIN_MOT_DE_PASSE="…"`, fichier jamais servi ni envoyé sur GitHub).
+
+### Contenu modifié par l'admin
+
+« Enregistrer » dans l'admin publie les fiches et la matrice sur le serveur : le jeu les charge en priorité, à la place de `data/orientech.xlsx`. « Revenir à l'Excel » les efface. Les fiches envoyées par les pros arrivent dans l'onglet « Propositions des pros » ; « Ajouter au jeu » crée le métier avec ses réponses, puis « Enregistrer » le publie.
