@@ -19,3 +19,5 @@ __pycache__/
 ~$*.xlsx
 .DS_Store
 Thumbs.db
+
+.vercel
