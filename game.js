@@ -139,14 +139,10 @@
     }, 1600);
   }
 
-  // Reveal sur la fiche : les cartes Métier, Salaire et Études sont cachées sous 3 coffres ;
-  // le reste de la fiche (au quotidien, trajectoire, boutons) s'affiche quand les 3 sont ouverts
+  // Reveal : coffre 1 = métier, coffre 2 = salaire, coffre 3 = études ; la fiche (déjà remplie) s'affiche ensuite
   function ouvrirCoffres(id, tout) {
-    const ecranResultat = document.querySelector('[data-screen="resultat"]');
-    show('resultat');
-    ecranResultat.classList.add('coffres-fermes');
-    const cartes = ['cardDynamique', 'cardSalaire', 'cardCursus'].map($).filter((el) => !el.classList.contains('hidden'));
-    Coffres.cacher({ cartes, tout, surFin: () => ecranResultat.classList.remove('coffres-fermes') });
+    show('coffres');
+    Coffres.ouvrir(base.metiers[id], { tout, surFin: () => show('resultat') });
   }
 
   // "Pas convaincu·e ?" : le métier proposé recule (sans être éliminé) et la partie continue 5 questions
@@ -168,8 +164,6 @@
 
   // affinite = null : fiche consultée depuis le catalogue (pas de "j'ai trouvé", pas d'affinité)
   function renderMetier(m, affinite) {
-    Coffres.reinitialiser(); // une fiche s'affiche toujours d'abord sans coffres ; ouvrirCoffres() les pose ensuite
-    document.querySelector('[data-screen="resultat"]').classList.remove('coffres-fermes');
     depuisFiches = affinite == null;
     $('rBulle').textContent = depuisFiches ? 'Voici la fiche du métier…' : "J'ai trouvé ! Tu as l'esprit d'un...";
     $('rAffiniteBadge').classList.toggle('hidden', depuisFiches);
@@ -196,7 +190,6 @@
     $('rSalaireUnite').textContent = m.salaire_unite || 'Brut mensuel débutant';
     $('rCursusSous').textContent = m.cursus_label || 'Parcours recommandé';
     $('rDynLabel').textContent = famille ? 'Métier' : 'Dynamique';
-    $('cardDynamique').dataset.titreCoffre = famille ? 'Métier' : 'Dynamique';
     $('rDynIcone').textContent = famille ? 'badge' : 'rocket_launch';
     $('rDynSous').textContent = 'Recrutements annuels';
     $('rDynSous').classList.toggle('hidden', famille);
