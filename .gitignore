@@ -1,0 +1,21 @@
+# Dépendances et builds
+node_modules/
+dist/
+build/
+
+# Secrets et réglages locaux
+.env
+.env.*
+.vercel/
+
+# Données de sessions écrites par serveur.py en local
+data/sessions.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Fichiers temporaires (Excel ouvert, systèmes)
+~$*.xlsx
+.DS_Store
+Thumbs.db

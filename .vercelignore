@@ -1,0 +1,3 @@
+# Serveur local (non utilisé sur Vercel : l'API en ligne est api/router.js)
+serveur.py
+data/sessions.json
