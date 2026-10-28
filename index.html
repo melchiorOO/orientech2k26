@@ -105,6 +105,84 @@
   .cellule { width: 2rem; height: 1.75rem; font-weight: 900; border: 1px solid rgba(0,0,0,.6); }
   .cellule:hover { outline: 2px solid #FFE600; outline-offset: -2px; }
 
+  /* ===== Reveal en 3 coffres (Clash Royale / Fortnite) ===== */
+  .coffre-slot { position: relative; width: 230px; height: 310px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .coffre-rarete { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-3deg); z-index: 5; white-space: nowrap;
+    font-family: "Luckiest Guy", sans-serif; font-size: .8rem; text-transform: uppercase; padding: .15rem .6rem; color: #000;
+    background: var(--rarete); border: 3px solid #000; border-radius: .4rem; box-shadow: 3px 3px 0 #000; }
+  .coffre-btn { position: relative; z-index: 2; width: 190px; margin-bottom: 38px; cursor: pointer; transition: filter .2s;
+    filter: drop-shadow(5px 6px 0 #000); animation: flotte 2.6s ease-in-out infinite; }
+  .coffre-btn svg { display: block; width: 100%; overflow: visible; }
+  .c-corps { fill: var(--rarete); }
+  .c-sombre { fill: var(--rarete-sombre); }
+  .c-lueur { fill: #fff; opacity: 0; }
+  .couvercle { transform-box: fill-box; transform-origin: 50% 100%; }
+  .coffre-tape { position: absolute; bottom: 0; font-family: "Luckiest Guy", sans-serif; text-transform: uppercase; color: #FFE600;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; font-size: 1.15rem; opacity: 0; }
+  .coffre-cadenas { position: absolute; z-index: 3; bottom: 70px; width: 44px; height: 44px; border-radius: .6rem; background: #1A072E;
+    border: 3px solid #000; box-shadow: 3px 3px 0 #000; display: none; align-items: center; justify-content: center; color: rgba(255,255,255,.7); }
+
+  /* verrouillé : en attente du coffre précédent */
+  .coffre-slot[data-etat="verrouille"] .coffre-btn { filter: grayscale(.9) brightness(.55) drop-shadow(5px 6px 0 #000); animation: none; cursor: not-allowed; }
+  .coffre-slot[data-etat="verrouille"] .coffre-cadenas { display: flex; }
+  .coffre-slot[data-etat="verrouille"] .coffre-rarete { filter: grayscale(.9) brightness(.7); }
+  /* prêt : c'est son tour */
+  .coffre-slot[data-etat="pret"] .coffre-btn { animation: flotte 1.3s ease-in-out infinite, halo 1.3s ease-in-out infinite; }
+  .coffre-slot[data-etat="pret"] .coffre-tape { opacity: 1; animation: tape .7s ease-in-out infinite; }
+  /* ouverture : il tremble de plus en plus (Clash Royale) */
+  .coffre-slot[data-etat="ouverture"] .coffre-btn { animation: secousse 1s linear both; cursor: default; }
+  .coffre-slot[data-etat="ouverture"] .c-lueur { animation: lueur 1s ease-in both; }
+  /* ouvert : état final (sans animation) */
+  .coffre-slot[data-etat="ouvert"] .coffre-btn { opacity: 0; transform: scale(.6); pointer-events: none; animation: none; }
+  .coffre-slot[data-etat="ouvert"] .couvercle { opacity: 0; transform: translate(-25px, -150px) rotate(-40deg); }
+  .coffre-slot[data-etat="ouvert"] .rayons { opacity: .55; }
+  .coffre-slot[data-etat="ouvert"] .carte-coffre { opacity: 1; transform: rotate(var(--rot)); }
+  /* ouvert avec l'animation complète (Fortnite) */
+  .coffre-slot.anime[data-etat="ouvert"] .coffre-btn { animation: coffre-disparait .45s .3s ease-in both; }
+  .coffre-slot.anime[data-etat="ouvert"] .couvercle { animation: couvercle-envol .6s cubic-bezier(.2,.8,.3,1) both; }
+  .coffre-slot.anime[data-etat="ouvert"] .rayons { animation: rayons-apparait .5s ease-out both, rayons-tourne 9s linear infinite; }
+  .coffre-slot.anime[data-etat="ouvert"] .flash { animation: flash .55s ease-out both; }
+  .coffre-slot.anime[data-etat="ouvert"] .carte-coffre { animation: carte-jaillit .85s .35s cubic-bezier(.2,1.5,.4,1) both; }
+
+  .rayons { position: absolute; z-index: 0; left: 50%; top: 52%; width: 380px; height: 380px; margin: -190px 0 0 -190px; opacity: 0; pointer-events: none;
+    background: repeating-conic-gradient(from 0deg, var(--rarete) 0deg 11deg, transparent 11deg 30deg);
+    -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); }
+  .flash { position: absolute; z-index: 4; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, #fff 0%, rgba(255,255,255,.85) 25%, transparent 65%); }
+  .carte-coffre { position: absolute; z-index: 3; left: 50%; top: 42px; width: 210px; margin-left: -105px; opacity: 0;
+    background: #2e1047; border: 4px solid #000; border-radius: 1rem; box-shadow: 6px 6px 0 #000; overflow: hidden; text-align: center; }
+  .carte-coffre .bandeau { background: var(--rarete); color: #000; border-bottom: 3px solid #000; font-family: "Luckiest Guy", sans-serif;
+    font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: .25rem; display: flex; align-items: center; justify-content: center; gap: .3rem; }
+  .particule { position: absolute; z-index: 4; left: 50%; top: 55%; font-size: var(--taille); color: var(--couleur); pointer-events: none;
+    text-shadow: 1px 1px 0 #000; animation: particule .95s cubic-bezier(.1,.7,.3,1) forwards; }
+
+  @keyframes flotte { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes halo { 0%,100% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 0 var(--rarete)); } 50% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 16px var(--rarete)); } }
+  @keyframes tape { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.08); } }
+  @keyframes secousse {
+    0% { transform: translateY(0) rotate(0); } 10% { transform: translateY(-14px) rotate(-3deg); } 20% { transform: translateY(-14px) rotate(3deg); }
+    30% { transform: translateY(-16px) rotate(-5deg) scale(1.03); } 40% { transform: translateY(-16px) rotate(5deg) scale(1.03); }
+    50% { transform: translateY(-18px) rotate(-7deg) scale(1.06); } 58% { transform: translateY(-18px) rotate(7deg) scale(1.06); }
+    66% { transform: translate(-4px,-20px) rotate(-9deg) scale(1.09); } 74% { transform: translate(4px,-20px) rotate(9deg) scale(1.09); }
+    82% { transform: translate(-6px,-22px) rotate(-11deg) scale(1.13); } 90% { transform: translate(6px,-22px) rotate(11deg) scale(1.13); }
+    100% { transform: translateY(-24px) rotate(0) scale(1.18); } }
+  @keyframes lueur { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes coffre-disparait { from { opacity: 1; transform: translateY(-24px) scale(1.18); } to { opacity: 0; transform: translateY(10px) scale(.6); } }
+  @keyframes couvercle-envol { from { opacity: 1; transform: none; } 70% { opacity: 1; } to { opacity: 0; transform: translate(-25px, -150px) rotate(-40deg); } }
+  @keyframes rayons-apparait { from { opacity: 0; transform: scale(.2); } to { opacity: .55; transform: scale(1); } }
+  @keyframes rayons-tourne { from { rotate: 0deg; } to { rotate: 360deg; } }
+  @keyframes flash { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
+  @keyframes carte-jaillit {
+    0% { opacity: 0; transform: translateY(80px) scale(.15) rotate(-25deg); }
+    55% { opacity: 1; transform: translateY(-46px) scale(1.12) rotate(8deg); }
+    100% { opacity: 1; transform: translateY(0) scale(1) rotate(var(--rot)); } }
+  @keyframes particule {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(.4); }
+    to { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--r)); } }
+  @media (prefers-reduced-motion: reduce) {
+    .coffre-btn, .coffre-tape, .rayons { animation: none !important; }
+  }
+
   [data-screen] { display: none; }
   [data-screen].active { display: flex; }
 </style>
@@ -620,6 +698,38 @@
   </section>
 </main>
 
+<!-- ===================== REVEAL : 3 COFFRES (métier, salaire, études) ===================== -->
+<main data-screen="coffres" class="relative z-10 flex-1 flex-col items-center px-4 max-w-5xl mx-auto w-full py-4 gap-4">
+  <div class="w-full flex justify-end">
+    <button id="cPasser" type="button" class="admin-btn bg-white">Passer<span class="material-symbols-outlined text-base">fast_forward</span></button>
+  </div>
+  <div class="flex items-end gap-3 -mt-6">
+    <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
+      <div class="medal w-full h-full animate-float">
+        <div class="medal-ring"><div></div></div>
+        <div class="medal-clip"><img src="avatars/resultat.png" alt=""></div>
+      </div>
+    </div>
+    <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
+      <p class="font-lucky text-base sm:text-lg tracking-wide uppercase">Ton résultat est prêt !</p>
+      <p id="cConsigne" class="font-extrabold text-sm text-[#FF2A85]">Ouvre tes 3 coffres un par un</p>
+    </div>
+  </div>
+
+  <div id="cGrille" class="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 w-full"></div>
+
+  <div id="cFin" class="hidden w-full max-w-sm pt-2 pb-4">
+    <button id="cVoirFiche" type="button" class="pop-card group relative w-full -skew-x-6 active:translate-x-1 active:translate-y-1">
+      <div class="absolute inset-0 bg-black rounded-xl translate-x-[5px] translate-y-[5px]"></div>
+      <div class="relative flex items-center justify-center gap-3 py-4 px-6 rounded-xl bg-gradient-to-r from-[#FF5E00] via-[#FF8A00] to-[#FFE600] border-[4px] border-black">
+        <div class="absolute top-1 left-2 right-2 h-2 bg-white/40 rounded-full"></div>
+        <span class="font-outfit font-black text-xl sm:text-2xl tracking-wider uppercase text-black">Voir ma fiche complète</span>
+        <span class="material-symbols-outlined text-3xl font-black text-black group-hover:translate-x-1 transition-transform">arrow_forward</span>
+      </div>
+    </button>
+  </div>
+</main>
+
 <!-- ===================== ÉCRAN QUESTION ===================== -->
 <main data-screen="question" class="relative z-10 flex-1 flex-col items-center justify-center px-4 max-w-lg mx-auto w-full py-4">
   <div class="relative w-full mb-2 flex flex-col items-center">
@@ -841,6 +951,7 @@
 <script src="pro.js"></script>
 <script src="fiches.js"></script>
 <script src="admin.js"></script>
+<script src="coffres.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

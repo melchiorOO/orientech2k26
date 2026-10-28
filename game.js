@@ -135,8 +135,14 @@
       // on peut redemander tant qu'il reste des questions à poser
       $('affinerBtn').classList.toggle('hidden', partie.questionsRestantes() === 0);
       $('affinerBtn').classList.toggle('flex', partie.questionsRestantes() > 0);
-      show('resultat');
+      ouvrirCoffres(id); // reveal en 3 coffres, puis la fiche complète
     }, 1600);
+  }
+
+  // Reveal : coffre 1 = métier, coffre 2 = salaire, coffre 3 = études ; la fiche (déjà remplie) s'affiche ensuite
+  function ouvrirCoffres(id, tout) {
+    show('coffres');
+    Coffres.ouvrir(base.metiers[id], { tout, surFin: () => show('resultat') });
   }
 
   // "Pas convaincu·e ?" : le métier proposé recule (sans être éliminé) et la partie continue 5 questions
@@ -379,6 +385,10 @@
   // Raccourcis de test : #profil, #mode, #code, #prof, #pro, #pro-questions, #fiches, #jouer ou #resultat=M01
   const [screen, target] = location.hash.slice(1).split('=');
   if (screen === 'fiches') ouvrirFiches();
+  if (screen === 'coffres') { // #coffres=M14 ou #coffres=M14&tout
+    const [idMetier, option] = String(target).split('&');
+    if (base.metiers[idMetier]) { renderMetier(base.metiers[idMetier], 95); ouvrirCoffres(idMetier, option === 'tout'); }
+  }
   if (screen === 'admin') ouvrirAdmin(target);
   if (screen === 'pro') ouvrirPro('proFiche');
   if (screen === 'pro-questions') ouvrirPro('proQuestions');
