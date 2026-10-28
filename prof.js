@@ -103,6 +103,7 @@
     $('pLancer').classList.toggle('hidden', phase !== 'attente');
     $('pTerminer').classList.toggle('hidden', phase !== 'direct');
     $('pTermine').classList.toggle('hidden', phase !== 'termine');
+    $('pTermine').classList.toggle('flex', phase === 'termine');
 
     eleves.forEach(rendreCarte);
     rendreTop(eleves);
@@ -188,6 +189,28 @@
     $('pProjection').classList.replace('flex', 'hidden');
   }
 
+  // La session du prof est gardée dans le navigateur : s'il recharge la page, il retrouve sa classe
+  const CLE_SESSION = 'orientech-prof-session';
+  const memoriser = (s) => { try { localStorage.setItem(CLE_SESSION, JSON.stringify(s)); } catch (e) { /* stockage refusé */ } };
+  const oublierSession = () => { try { localStorage.removeItem(CLE_SESSION); } catch (e) { /* stockage refusé */ } };
+  function sessionMemorisee() {
+    try { const s = JSON.parse(localStorage.getItem(CLE_SESSION)); return s && s.code && s.token ? s : null; } catch (e) { return null; }
+  }
+
+  // Reprend la session en cours si elle existe encore et n'est pas terminée ; sinon en crée une nouvelle
+  async function obtenirSession(forcerNouvelle) {
+    const ancienne = !forcerNouvelle && sessionMemorisee();
+    if (ancienne) {
+      try {
+        const e = await api('GET', `/api/sessions/${ancienne.code}?token=${encodeURIComponent(ancienne.token)}`);
+        if (e.phase !== 'termine') return { session: ancienne, reprise: true };
+      } catch (err) { /* expirée ou supprimée : on en crée une autre */ }
+    }
+    const s = await api('POST', '/api/sessions');
+    memoriser(s);
+    return { session: s, reprise: false };
+  }
+
   async function ouvrir(b, options = {}) {
     fermer();
     const g = generation;
@@ -196,13 +219,16 @@
     Object.keys(cartes).forEach((k) => delete cartes[k]);
     $('pGrille').innerHTML = '';
     $('pCode').textContent = '······';
+    let reprise = false;
     try {
-      const s = await api('POST', '/api/sessions');
+      const r = await obtenirSession(options.nouvelle);
       if (g !== generation) return; // le prof est déjà reparti
-      session = s;
+      session = r.session;
+      reprise = r.reprise;
     } catch (err) {
       return toast(`Impossible de créer la session : ${err.message === 'Failed to fetch' ? 'serveur injoignable' : err.message}`);
     }
+    if (reprise) toast(`Session ${session.code} reprise`);
     $('pCode').textContent = session.code;
     $('pProjectionCode').textContent = session.code;
     await rafraichir();
@@ -213,7 +239,12 @@
     if (!etat || !etat.eleves.length) return toast('Attends que des élèves arrivent !');
     action('lancer');
   };
-  $('pTerminer').onclick = () => action('terminer');
+  $('pTerminer').onclick = async () => {
+    if (!confirm('Terminer la session ? Les élèves encore en jeu seront arrêtés.')) return;
+    await action('terminer');
+    oublierSession();
+  };
+  $('pNouvelle').onclick = () => ouvrir(base, { toast, nouvelle: true });
   $('pCopier').onclick = () => {
     if (!session) return;
     navigator.clipboard?.writeText(session.code).catch(() => {});
