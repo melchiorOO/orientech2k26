@@ -4,19 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORIENTech</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Outfit:wght@600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=Luckiest+Guy&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: { extend: { fontFamily: {
-      sans: ["Plus Jakarta Sans", "sans-serif"],
-      outfit: ["Outfit", "sans-serif"],
-      space: ["Space Grotesk", "sans-serif"],
-      lucky: ["Luckiest Guy", "sans-serif"]
-    } } }
-  };
-</script>
 <style>
   html, body { margin: 0; padding: 0; min-height: 100%; }
   body { overscroll-behavior: none; }
@@ -127,7 +117,11 @@
   .coffre-slot[data-etat="verrouille"] .coffre-cadenas { display: flex; }
   .coffre-slot[data-etat="verrouille"] .coffre-rarete { filter: grayscale(.9) brightness(.7); }
   /* prêt : c'est son tour */
-  .coffre-slot[data-etat="pret"] .coffre-btn { animation: flotte 1.3s ease-in-out infinite, halo 1.3s ease-in-out infinite; }
+  .coffre-slot[data-etat="pret"] .coffre-btn { animation: flotte 1.3s ease-in-out infinite; }
+  /* halo lumineux derrière le coffre prêt : seules l'opacité et l'échelle sont animées (pas de repeinture) */
+  .coffre-btn::before { content: ''; position: absolute; z-index: -1; inset: 18% 2% -4% 2%; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(closest-side, var(--rarete), transparent); }
+  .coffre-slot[data-etat="pret"] .coffre-btn::before { animation: halo 1.3s ease-in-out infinite; }
   .coffre-slot[data-etat="pret"] .coffre-tape { opacity: 1; animation: tape .7s ease-in-out infinite; }
   /* ouverture : il tremble de plus en plus (Clash Royale) */
   .coffre-slot[data-etat="ouverture"] .coffre-btn { animation: secousse 1s linear both; cursor: default; }
@@ -157,7 +151,7 @@
     text-shadow: 1px 1px 0 #000; animation: particule .95s cubic-bezier(.1,.7,.3,1) forwards; }
 
   @keyframes flotte { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-  @keyframes halo { 0%,100% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 0 var(--rarete)); } 50% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 16px var(--rarete)); } }
+  @keyframes halo { 0%,100% { opacity: 0; transform: scale(.85); } 50% { opacity: .8; transform: scale(1.1); } }
   @keyframes tape { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.08); } }
   @keyframes secousse {
     0% { transform: translateY(0) rotate(0); } 10% { transform: translateY(-14px) rotate(-3deg); } 20% { transform: translateY(-14px) rotate(3deg); }
@@ -186,6 +180,8 @@
   [data-screen] { display: none; }
   [data-screen].active { display: flex; }
 </style>
+<!-- Tailwind précompilé (voir tailwind.config.js) ; placé après les styles maison comme l'était la CSS du CDN -->
+<link rel="stylesheet" href="tailwind.css">
 </head>
 <body class="bg-gradient-to-b from-[#1A072E] via-[#240A3F] to-[#2E0B4E] text-white font-sans min-h-screen w-full select-none overflow-x-hidden relative flex flex-col">
 
@@ -248,7 +244,7 @@
     <div class="absolute bottom-3 -left-3 bg-[#FF2A85] text-white font-black text-[10px] px-1.5 py-0.5 rounded border-2 border-black comic-shadow-sm -rotate-12 z-20">LVL 100</div>
     <div class="medal w-full h-full animate-float">
       <div class="medal-ring"><div></div></div>
-      <div class="medal-clip"><img src="avatars/accueil.png" alt="Ta conseillère d'orientation"></div>
+      <div class="medal-clip"><img decoding="async" src="avatars/accueil.png" alt="Ta conseillère d'orientation"></div>
     </div>
   </div>
 
@@ -271,7 +267,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/accueil.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/accueil.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
@@ -305,7 +301,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/resultat.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/resultat.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] -rotate-1 mb-4">
@@ -334,7 +330,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/question.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/question.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
@@ -371,7 +367,7 @@
   <div class="relative w-52 h-52 sm:w-60 sm:h-60 mt-24">
     <div class="medal w-full h-full animate-float">
       <div class="medal-ring"><div></div></div>
-      <div class="medal-clip"><img src="avatars/reflexion.png" alt=""></div>
+      <div class="medal-clip"><img decoding="async" src="avatars/reflexion.png" alt=""></div>
     </div>
   </div>
   <div class="bg-white text-black px-6 py-4 rounded-2xl border-[4px] border-black shadow-[5px_5px_0_#ff2a85] -rotate-1">
@@ -465,7 +461,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/accueil.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/accueil.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
@@ -559,7 +555,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/question.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/question.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] -rotate-1 mb-4 max-w-md">
@@ -599,7 +595,7 @@
   <div class="relative w-52 h-52 sm:w-60 sm:h-60 mt-24">
     <div class="medal w-full h-full animate-float">
       <div class="medal-ring"><div></div></div>
-      <div class="medal-clip"><img src="avatars/resultat.png" alt=""></div>
+      <div class="medal-clip"><img decoding="async" src="avatars/resultat.png" alt=""></div>
     </div>
   </div>
   <div class="bg-white text-black px-6 py-4 rounded-2xl border-[4px] border-black shadow-[5px_5px_0_#ff2a85] -rotate-1">
@@ -626,7 +622,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/reflexion.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/reflexion.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
@@ -707,7 +703,7 @@
     <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
       <div class="medal w-full h-full animate-float">
         <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/resultat.png" alt=""></div>
+        <div class="medal-clip"><img decoding="async" src="avatars/resultat.png" alt=""></div>
       </div>
     </div>
     <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
@@ -764,7 +760,7 @@
     <div class="absolute bottom-6 -left-5 text-[#FF6B00] font-black text-xl z-20">★</div>
     <div class="medal w-full h-full animate-float">
       <div class="medal-ring"><div></div></div>
-      <div class="medal-clip"><img src="avatars/question.png" alt="La conseillère réfléchit"></div>
+      <div class="medal-clip"><img decoding="async" src="avatars/question.png" alt="La conseillère réfléchit"></div>
     </div>
   </div>
 
@@ -789,7 +785,7 @@
       <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
         <div class="medal w-full h-full animate-float">
           <div class="medal-ring"><div></div></div>
-          <div class="medal-clip"><img src="avatars/resultat.png" alt="La conseillère te félicite"></div>
+          <div class="medal-clip"><img decoding="async" src="avatars/resultat.png" alt="La conseillère te félicite"></div>
         </div>
       </div>
       <div class="bg-white text-black px-5 py-2.5 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] flex items-center gap-2 rotate-1 mb-4">
@@ -939,13 +935,13 @@
   <div class="relative w-56 h-56 sm:w-64 sm:h-64 mt-16">
     <div class="medal w-full h-full animate-float">
       <div class="medal-ring"><div></div></div>
-      <div class="medal-clip"><img src="avatars/reflexion.png" alt="La conseillère consulte ses dossiers"></div>
+      <div class="medal-clip"><img decoding="async" src="avatars/reflexion.png" alt="La conseillère consulte ses dossiers"></div>
     </div>
   </div>
   <p class="mt-8 font-lucky text-3xl uppercase tracking-wider text-[#ffe600] lucky-stroke animate-pulse">Je réfléchis...</p>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script><!-- SheetJS 0.18.5, hébergé avec le site -->
 <script src="moteur.js"></script>
 <script src="prof.js"></script>
 <script src="pro.js"></script>

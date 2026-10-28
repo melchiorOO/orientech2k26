@@ -30,6 +30,16 @@ avatars/          avatars PNG détourés
 
 Pour changer les questions ou les métiers : remplacer `data/orientech.xlsx` (même structure que `MELCHIOR_Orien_Tech_V6.xlsx`).
 
+## CSS (Tailwind précompilé)
+
+Les classes Tailwind sont compilées une fois dans `tailwind.css` (plus de compilation dans le navigateur). **Après avoir ajouté ou changé des classes** dans `index.html` ou un `.js`, régénérer :
+
+```bash
+npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.src.css -o tailwind.css --minify
+```
+
+Une classe construite dynamiquement en JS (ex. `` `sm:grid-cols-${n}` ``) doit être ajoutée à `safelist` dans `tailwind.config.js`.
+
 ## Lancer en local
 
 ```bash

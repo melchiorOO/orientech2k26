@@ -222,11 +222,26 @@ class Handler(SimpleHTTPRequestHandler):
         except Erreur as err:
             self.repondre(err.statut, {"erreur": err.message})
 
+    def fichier_interdit(self) -> bool:
+        """Fichiers jamais servis sur le réseau : cachés (.env.local avec les clés Redis, .vercel, .git…),
+        sessions.json (jetons prof/élèves) et le code Python. Le test porte sur le chemin réel, une fois l'URL
+        décodée et normalisée par translate_path, et ignore la casse (Windows)."""
+        chemin = Path(self.translate_path(self.path)).resolve()
+        try:
+            parties = chemin.relative_to(DOSSIER).parts
+        except ValueError:
+            return True  # en dehors du dossier de l'app
+        return any(p.startswith(".") or p.lower() == "sessions.json" or p.lower().endswith(".py") for p in parties)
+
+    def send_head(self):  # utilisé par GET et HEAD
+        if self.fichier_interdit():
+            self.send_error(404, "Introuvable")
+            return None
+        return super().send_head()
+
     def do_GET(self):
         if self.path.startswith("/api/"):
             return self.api("GET")
-        if self.path.startswith("/data/sessions.json"):
-            return self.repondre(404, {"erreur": "Introuvable"})
         super().do_GET()
 
     def do_POST(self):
@@ -249,4 +264,6 @@ if __name__ == "__main__":
     charger()
     print(f"ORIENTech en ligne :\n  sur ce PC          http://localhost:{port}\n"
           f"  pour les élèves    http://{ip_locale()}:{port}   (même Wi-Fi)", flush=True)
+    # File d'attente de connexions élargie : par défaut 5 sous Windows, ce qui refuse une classe qui se connecte d'un coup
+    ThreadingHTTPServer.request_queue_size = 128
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

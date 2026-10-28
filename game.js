@@ -2,8 +2,27 @@
 (async function () {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const buffer = await fetch('data/orientech.xlsx', { cache: 'no-store' }).then((r) => r.arrayBuffer());
-  const base = Moteur.lireClasseur(XLSX, XLSX.read(buffer));
+
+  // Sans les données, aucun bouton ne marche : on le dit clairement au lieu d'échouer en silence
+  function erreurChargement(err) {
+    console.error('[ORIENTech] Impossible de charger les données du jeu', err);
+    const alerte = document.createElement('div');
+    alerte.setAttribute('role', 'alert');
+    alerte.className = 'fixed inset-x-4 bottom-20 z-50 mx-auto max-w-md bg-[#FF2A85] text-white border-[3px] border-black rounded-xl shadow-[4px_4px_0_#000] p-4 flex flex-col items-center gap-2 text-center font-bold';
+    alerte.innerHTML = '<p>Oups, impossible de charger les questions du jeu. Vérifie ta connexion.</p><button type="button" class="admin-btn bg-white">Réessayer</button>';
+    alerte.querySelector('button').onclick = () => location.reload();
+    document.body.appendChild(alerte);
+  }
+
+  let base;
+  try {
+    const reponse = await fetch('data/orientech.xlsx', { cache: 'no-store' });
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    base = Moteur.lireClasseur(XLSX, XLSX.read(await reponse.arrayBuffer()));
+    if (!base.questions.length || !Object.keys(base.metiers).length) throw new Error('aucune question ou aucun métier dans le fichier');
+  } catch (err) {
+    return erreurChargement(err);
+  }
 
   let partie = null;
   let current = null; // question affichée
@@ -101,7 +120,7 @@
       fini: !!metierFinal,
       metier: metierFinal || '',
       affinite: metierFinal ? partie.affinite(metierFinal) : 0
-    }).catch(() => {}); // une coupure ne doit pas bloquer la partie
+    }).catch((err) => console.warn('[ORIENTech] progression non envoyée au prof', err)); // une coupure ne doit pas bloquer la partie
   }
 
   // Salle d'attente élève : on attend que le prof clique "Lancer la session"
@@ -109,12 +128,18 @@
     $('salleMessage').textContent = `C'est noté, ${contexte.prenom} !`;
     show('salle');
     const e = contexte.eleve;
+    let echecs = 0;
     attenteProf = setInterval(async () => {
       try {
         const { phase } = await api('GET', `/api/sessions/${e.code}/eleves/${e.id}?token=${encodeURIComponent(e.token)}`);
+        if (echecs >= 3) toast('Connexion rétablie');
+        echecs = 0;
         if (phase === 'direct') { toast("C'est parti !"); start(); }
         if (phase === 'termine') { toast('La session a été terminée par ton prof.'); goHome(); }
-      } catch (err) { /* on réessaie au prochain tour */ }
+      } catch (err) { // on réessaie au prochain tour, mais on prévient si ça dure
+        console.warn('[ORIENTech] salle d\'attente : serveur injoignable', err);
+        if (++echecs === 3) toast('Connexion perdue… nouvel essai en cours');
+      }
     }, 2000);
   }
 

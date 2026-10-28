@@ -1,3 +1,11 @@
+# Secrets locaux (les variables d'environnement en ligne sont gérées par Vercel)
+.env
+.env.*
+
 # Serveur local (non utilisé sur Vercel : l'API en ligne est api/router.js)
 serveur.py
 data/sessions.json
+
+# Sources de la CSS (seul tailwind.css, déjà généré, est servi)
+tailwind.config.js
+tailwind.src.css

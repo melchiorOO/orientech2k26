@@ -56,6 +56,13 @@
     arrete: 'bg-[#2e1047] text-white opacity-60'
   };
 
+  // L'état est relu toutes les 1,5 s : on ne touche au DOM que si le contenu a vraiment changé
+  function remplacer(el, html) {
+    if (el._html === html) return;
+    el._html = html;
+    el.innerHTML = html;
+  }
+
   function rendreCarte(e, i) {
     let el = cartes[e.id];
     if (!el) {
@@ -65,8 +72,9 @@
       $('pGrille').appendChild(el);
     }
     const rot = ['-rotate-1', 'rotate-1', 'rotate-0'][i % 3];
-    el.className = `relative min-h-[110px] rounded-xl border-[3px] border-black p-3 text-left flex flex-col gap-1.5 transition hover:-translate-y-1 shadow-[4px_4px_0_#000] ${rot} ${STYLES[e.statut] || STYLES.attente}`;
-    el.innerHTML = contenuCarte(e);
+    const classes = `relative min-h-[110px] rounded-xl border-[3px] border-black p-3 text-left flex flex-col gap-1.5 transition hover:-translate-y-1 shadow-[4px_4px_0_#000] ${rot} ${STYLES[e.statut] || STYLES.attente}`;
+    if (el.className !== classes) el.className = classes;
+    remplacer(el, contenuCarte(e));
   }
 
   function rendreTop(eleves) {
@@ -74,7 +82,7 @@
     eleves.filter((e) => e.statut === 'fini').forEach((e) => (compte[e.metier] = (compte[e.metier] || 0) + 1));
     const top = Object.entries(compte).sort((a, b) => b[1] - a[1]).slice(0, 6);
     const max = top.length ? top[0][1] : 1;
-    $('pTopListe').innerHTML = top.length
+    remplacer($('pTopListe'), top.length
       ? top.map(([m, n], i) => `
         <div class="flex items-center gap-3">
           <span class="w-40 sm:w-64 shrink-0 text-xs sm:text-sm font-extrabold truncate" title="${esc(nomMetier(m))}">${esc(nomMetier(m))}</span>
@@ -83,7 +91,7 @@
           </div>
           <span class="w-8 font-lucky text-lg text-right">${n}</span>
         </div>`).join('')
-      : `<p class="text-sm font-bold text-white/60">Les premiers résultats arrivent dès qu'un élève a fini…</p>`;
+      : `<p class="text-sm font-bold text-white/60">Les premiers résultats arrivent dès qu'un élève a fini…</p>`);
   }
 
   function rendre() {
@@ -144,7 +152,7 @@
     } else {
       html += `<p class="text-sm font-bold text-white/60">Pas encore de réponse.</p>`;
     }
-    $('pModalContenu').innerHTML = html;
+    remplacer($('pModalContenu'), html);
   }
 
   function ouvrirFiche(id) {
@@ -159,14 +167,18 @@
 
   // ---------- Échanges avec le serveur
 
+  let echecs = 0; // échecs de rafraîchissement d'affilée
   async function rafraichir() {
     if (!session) return;
     const g = generation;
     try {
       const donnees = await api('GET', `/api/sessions/${session.code}?token=${encodeURIComponent(session.token)}`);
+      if (echecs >= 3) toast('Connexion rétablie');
+      echecs = 0;
       if (g === generation) { etat = donnees; rendre(); }
-    } catch (err) {
-      /* coupure réseau passagère : on réessaiera au prochain tour */
+    } catch (err) { // coupure passagère : on réessaie au prochain tour, mais on prévient si ça dure
+      console.warn('[ORIENTech] suivi de classe : serveur injoignable', err);
+      if (++echecs === 3) toast('Connexion perdue… le suivi reprendra tout seul');
     }
   }
 
@@ -245,10 +257,15 @@
     oublierSession();
   };
   $('pNouvelle').onclick = () => ouvrir(base, { toast, nouvelle: true });
-  $('pCopier').onclick = () => {
+  $('pCopier').onclick = async () => {
     if (!session) return;
-    navigator.clipboard?.writeText(session.code).catch(() => {});
-    toast(`Code ${session.code} copié !`);
+    try {
+      await navigator.clipboard.writeText(session.code);
+      toast(`Code ${session.code} copié !`);
+    } catch (err) { // presse-papier refusé (http, permissions…) : on ne prétend pas que c'est copié
+      console.warn('[ORIENTech] copie du code impossible', err);
+      toast(`Copie impossible : note le code ${session.code}`);
+    }
   };
   $('pProjeter').onclick = () => session && $('pProjection').classList.replace('hidden', 'flex');
   $('pProjection').onclick = () => $('pProjection').classList.replace('flex', 'hidden');
