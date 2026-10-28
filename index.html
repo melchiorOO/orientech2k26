@@ -105,56 +105,56 @@
   .cellule { width: 2rem; height: 1.75rem; font-weight: 900; border: 1px solid rgba(0,0,0,.6); }
   .cellule:hover { outline: 2px solid #FFE600; outline-offset: -2px; }
 
-  /* ===== Reveal en 3 coffres (Clash Royale / Fortnite) ===== */
-  .coffre-slot { position: relative; width: 230px; height: 310px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-  .coffre-rarete { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-3deg); z-index: 5; white-space: nowrap;
-    font-family: "Luckiest Guy", sans-serif; font-size: .8rem; text-transform: uppercase; padding: .15rem .6rem; color: #000;
+  /* ===== Reveal en 3 coffres posés SUR les cartes de la fiche (Clash Royale / Fortnite) ===== */
+  /* Tant que le coffre est fermé, le contenu de la carte est invisible (mais garde sa place) */
+  .carte-cachee > :not(.coffre-couche):not(.particule) { opacity: 0; }
+  .carte-revelee > :not(.coffre-couche):not(.particule) { animation: contenu-revele .7s cubic-bezier(.2,1.5,.4,1) both; }
+  .carte-cachee, .carte-revelee { min-height: 230px; }
+  /* le reste de la fiche n'apparaît qu'une fois les 3 coffres ouverts */
+  [data-screen="resultat"].coffres-fermes [data-apres-coffres] { display: none !important; }
+  [data-screen="resultat"] [data-apres-coffres] { animation: contenu-revele .6s ease-out both; }
+
+  .coffre-couche { position: absolute; inset: -3.5px; z-index: 10; border-radius: 1rem; background: #1e0a30; border: 3.5px solid #000;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; overflow: visible; }
+  .coffre-rarete { position: absolute; top: -12px; left: 50%; transform: translateX(-50%) rotate(-3deg); z-index: 5; white-space: nowrap;
+    font-family: "Luckiest Guy", sans-serif; font-size: .75rem; text-transform: uppercase; padding: .15rem .6rem; color: #000;
     background: var(--rarete); border: 3px solid #000; border-radius: .4rem; box-shadow: 3px 3px 0 #000; }
-  .coffre-btn { position: relative; z-index: 2; width: 190px; margin-bottom: 38px; cursor: pointer; transition: filter .2s;
+  .coffre-btn { position: relative; z-index: 2; width: 165px; margin-bottom: 36px; cursor: pointer; transition: filter .2s;
     filter: drop-shadow(5px 6px 0 #000); animation: flotte 2.6s ease-in-out infinite; }
   .coffre-btn svg { display: block; width: 100%; overflow: visible; }
   .c-corps { fill: var(--rarete); }
   .c-sombre { fill: var(--rarete-sombre); }
   .c-lueur { fill: #fff; opacity: 0; }
   .couvercle { transform-box: fill-box; transform-origin: 50% 100%; }
-  .coffre-tape { position: absolute; bottom: 0; font-family: "Luckiest Guy", sans-serif; text-transform: uppercase; color: #FFE600;
-    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; font-size: 1.15rem; opacity: 0; }
-  .coffre-cadenas { position: absolute; z-index: 3; bottom: 70px; width: 44px; height: 44px; border-radius: .6rem; background: #1A072E;
+  .coffre-tape { position: absolute; bottom: 8px; font-family: "Luckiest Guy", sans-serif; text-transform: uppercase; color: #FFE600;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; font-size: 1.05rem; opacity: 0; }
+  .coffre-cadenas { position: absolute; z-index: 3; bottom: 62px; width: 42px; height: 42px; border-radius: .6rem; background: #1A072E;
     border: 3px solid #000; box-shadow: 3px 3px 0 #000; display: none; align-items: center; justify-content: center; color: rgba(255,255,255,.7); }
-
-  /* verrouillé : en attente du coffre précédent */
-  .coffre-slot[data-etat="verrouille"] .coffre-btn { filter: grayscale(.9) brightness(.55) drop-shadow(5px 6px 0 #000); animation: none; cursor: not-allowed; }
-  .coffre-slot[data-etat="verrouille"] .coffre-cadenas { display: flex; }
-  .coffre-slot[data-etat="verrouille"] .coffre-rarete { filter: grayscale(.9) brightness(.7); }
-  /* prêt : c'est son tour */
-  .coffre-slot[data-etat="pret"] .coffre-btn { animation: flotte 1.3s ease-in-out infinite, halo 1.3s ease-in-out infinite; }
-  .coffre-slot[data-etat="pret"] .coffre-tape { opacity: 1; animation: tape .7s ease-in-out infinite; }
-  /* ouverture : il tremble de plus en plus (Clash Royale) */
-  .coffre-slot[data-etat="ouverture"] .coffre-btn { animation: secousse 1s linear both; cursor: default; }
-  .coffre-slot[data-etat="ouverture"] .c-lueur { animation: lueur 1s ease-in both; }
-  /* ouvert : état final (sans animation) */
-  .coffre-slot[data-etat="ouvert"] .coffre-btn { opacity: 0; transform: scale(.6); pointer-events: none; animation: none; }
-  .coffre-slot[data-etat="ouvert"] .couvercle { opacity: 0; transform: translate(-25px, -150px) rotate(-40deg); }
-  .coffre-slot[data-etat="ouvert"] .rayons { opacity: .55; }
-  .coffre-slot[data-etat="ouvert"] .carte-coffre { opacity: 1; transform: rotate(var(--rot)); }
-  /* ouvert avec l'animation complète (Fortnite) */
-  .coffre-slot.anime[data-etat="ouvert"] .coffre-btn { animation: coffre-disparait .45s .3s ease-in both; }
-  .coffre-slot.anime[data-etat="ouvert"] .couvercle { animation: couvercle-envol .6s cubic-bezier(.2,.8,.3,1) both; }
-  .coffre-slot.anime[data-etat="ouvert"] .rayons { animation: rayons-apparait .5s ease-out both, rayons-tourne 9s linear infinite; }
-  .coffre-slot.anime[data-etat="ouvert"] .flash { animation: flash .55s ease-out both; }
-  .coffre-slot.anime[data-etat="ouvert"] .carte-coffre { animation: carte-jaillit .85s .35s cubic-bezier(.2,1.5,.4,1) both; }
-
-  .rayons { position: absolute; z-index: 0; left: 50%; top: 52%; width: 380px; height: 380px; margin: -190px 0 0 -190px; opacity: 0; pointer-events: none;
+  .rayons { position: absolute; z-index: 0; left: 50%; top: 55%; width: 360px; height: 360px; margin: -180px 0 0 -180px; opacity: 0; pointer-events: none;
     background: repeating-conic-gradient(from 0deg, var(--rarete) 0deg 11deg, transparent 11deg 30deg);
     -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); }
   .flash { position: absolute; z-index: 4; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
     background: radial-gradient(circle, #fff 0%, rgba(255,255,255,.85) 25%, transparent 65%); }
-  .carte-coffre { position: absolute; z-index: 3; left: 50%; top: 42px; width: 210px; margin-left: -105px; opacity: 0;
-    background: #2e1047; border: 4px solid #000; border-radius: 1rem; box-shadow: 6px 6px 0 #000; overflow: hidden; text-align: center; }
-  .carte-coffre .bandeau { background: var(--rarete); color: #000; border-bottom: 3px solid #000; font-family: "Luckiest Guy", sans-serif;
-    font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: .25rem; display: flex; align-items: center; justify-content: center; gap: .3rem; }
-  .particule { position: absolute; z-index: 4; left: 50%; top: 55%; font-size: var(--taille); color: var(--couleur); pointer-events: none;
+  .particule { position: absolute; z-index: 20; left: 50%; top: 55%; font-size: var(--taille); color: var(--couleur); pointer-events: none;
     text-shadow: 1px 1px 0 #000; animation: particule .95s cubic-bezier(.1,.7,.3,1) forwards; }
+
+  /* verrouillé : en attente du coffre précédent */
+  .coffre-couche[data-etat="verrouille"] .coffre-btn { filter: grayscale(.9) brightness(.55) drop-shadow(5px 6px 0 #000); animation: none; cursor: not-allowed; }
+  .coffre-couche[data-etat="verrouille"] .coffre-cadenas { display: flex; }
+  .coffre-couche[data-etat="verrouille"] .coffre-rarete { filter: grayscale(.9) brightness(.7); }
+  /* prêt : c'est son tour */
+  .coffre-couche[data-etat="pret"] .coffre-btn { animation: flotte 1.3s ease-in-out infinite, halo 1.3s ease-in-out infinite; }
+  .coffre-couche[data-etat="pret"] .coffre-tape { opacity: 1; animation: tape .7s ease-in-out infinite; }
+  /* ouverture : il tremble de plus en plus */
+  .coffre-couche[data-etat="ouverture"] .coffre-btn { animation: secousse 1s linear both; cursor: default; }
+  .coffre-couche[data-etat="ouverture"] .c-lueur { animation: lueur 1s ease-in both; }
+  /* ouvert : explosion, puis la couche disparaît et la carte apparaît */
+  .coffre-couche[data-etat="ouvert"] { pointer-events: none; animation: couche-disparait .45s .45s ease-in both; background: transparent; border-color: transparent; }
+  .coffre-couche[data-etat="ouvert"] .coffre-btn { animation: coffre-disparait .45s .25s ease-in both; }
+  .coffre-couche[data-etat="ouvert"] .couvercle { animation: couvercle-envol .6s cubic-bezier(.2,.8,.3,1) both; }
+  .coffre-couche[data-etat="ouvert"] .rayons { animation: rayons-apparait .5s ease-out both, rayons-tourne 9s linear infinite; }
+  .coffre-couche[data-etat="ouvert"] .flash { animation: flash .55s ease-out both; }
+  .coffre-couche[data-etat="ouvert"] .coffre-rarete, .coffre-couche[data-etat="ouvert"] .coffre-tape { opacity: 0; }
 
   @keyframes flotte { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
   @keyframes halo { 0%,100% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 0 var(--rarete)); } 50% { filter: drop-shadow(5px 6px 0 #000) drop-shadow(0 0 16px var(--rarete)); } }
@@ -169,18 +169,16 @@
   @keyframes lueur { 0% { opacity: 0; } 100% { opacity: 1; } }
   @keyframes coffre-disparait { from { opacity: 1; transform: translateY(-24px) scale(1.18); } to { opacity: 0; transform: translateY(10px) scale(.6); } }
   @keyframes couvercle-envol { from { opacity: 1; transform: none; } 70% { opacity: 1; } to { opacity: 0; transform: translate(-25px, -150px) rotate(-40deg); } }
+  @keyframes couche-disparait { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
   @keyframes rayons-apparait { from { opacity: 0; transform: scale(.2); } to { opacity: .55; transform: scale(1); } }
   @keyframes rayons-tourne { from { rotate: 0deg; } to { rotate: 360deg; } }
   @keyframes flash { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
-  @keyframes carte-jaillit {
-    0% { opacity: 0; transform: translateY(80px) scale(.15) rotate(-25deg); }
-    55% { opacity: 1; transform: translateY(-46px) scale(1.12) rotate(8deg); }
-    100% { opacity: 1; transform: translateY(0) scale(1) rotate(var(--rot)); } }
+  @keyframes contenu-revele { 0% { opacity: 0; transform: translateY(30px) scale(.6); } 60% { opacity: 1; transform: translateY(-8px) scale(1.06); } 100% { opacity: 1; transform: none; } }
   @keyframes particule {
     from { opacity: 1; transform: translate(-50%, -50%) scale(.4); }
     to { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--r)); } }
   @media (prefers-reduced-motion: reduce) {
-    .coffre-btn, .coffre-tape, .rayons { animation: none !important; }
+    .coffre-btn, .coffre-tape, .rayons, .carte-revelee > *, [data-apres-coffres] { animation: none !important; }
   }
 
   [data-screen] { display: none; }
@@ -698,38 +696,6 @@
   </section>
 </main>
 
-<!-- ===================== REVEAL : 3 COFFRES (métier, salaire, études) ===================== -->
-<main data-screen="coffres" class="relative z-10 flex-1 flex-col items-center px-4 max-w-5xl mx-auto w-full py-4 gap-4">
-  <div class="w-full flex justify-end">
-    <button id="cPasser" type="button" class="admin-btn bg-white">Passer<span class="material-symbols-outlined text-base">fast_forward</span></button>
-  </div>
-  <div class="flex items-end gap-3 -mt-6">
-    <div class="relative w-24 h-24 sm:w-28 sm:h-28 mt-10 shrink-0">
-      <div class="medal w-full h-full animate-float">
-        <div class="medal-ring"><div></div></div>
-        <div class="medal-clip"><img src="avatars/resultat.png" alt=""></div>
-      </div>
-    </div>
-    <div class="bg-white text-black px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#ff2a85] rotate-1 mb-4">
-      <p class="font-lucky text-base sm:text-lg tracking-wide uppercase">Ton résultat est prêt !</p>
-      <p id="cConsigne" class="font-extrabold text-sm text-[#FF2A85]">Ouvre tes 3 coffres un par un</p>
-    </div>
-  </div>
-
-  <div id="cGrille" class="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 w-full"></div>
-
-  <div id="cFin" class="hidden w-full max-w-sm pt-2 pb-4">
-    <button id="cVoirFiche" type="button" class="pop-card group relative w-full -skew-x-6 active:translate-x-1 active:translate-y-1">
-      <div class="absolute inset-0 bg-black rounded-xl translate-x-[5px] translate-y-[5px]"></div>
-      <div class="relative flex items-center justify-center gap-3 py-4 px-6 rounded-xl bg-gradient-to-r from-[#FF5E00] via-[#FF8A00] to-[#FFE600] border-[4px] border-black">
-        <div class="absolute top-1 left-2 right-2 h-2 bg-white/40 rounded-full"></div>
-        <span class="font-outfit font-black text-xl sm:text-2xl tracking-wider uppercase text-black">Voir ma fiche complète</span>
-        <span class="material-symbols-outlined text-3xl font-black text-black group-hover:translate-x-1 transition-transform">arrow_forward</span>
-      </div>
-    </button>
-  </div>
-</main>
-
 <!-- ===================== ÉCRAN QUESTION ===================== -->
 <main data-screen="question" class="relative z-10 flex-1 flex-col items-center justify-center px-4 max-w-lg mx-auto w-full py-4">
   <div class="relative w-full mb-2 flex flex-col items-center">
@@ -809,8 +775,13 @@
       <p id="rDescription" class="hidden max-w-2xl bg-white text-black font-bold text-sm sm:text-base leading-snug px-5 py-3 rounded-2xl border-[3.5px] border-black shadow-[5px_5px_0_#00E5FF] rotate-1"></p>
     </div>
 
+    <!-- Tant qu'il reste des coffres fermés : consigne + "Tout ouvrir" -->
+    <div id="rCoffresBarre" class="hidden w-full items-center justify-between gap-3">
+      <p class="font-lucky text-sm sm:text-base uppercase text-[#FFE600] lucky-stroke">👆 Ouvre tes 3 coffres dans l'ordre !</p>
+      <button id="rToutOuvrir" type="button" class="admin-btn bg-white shrink-0">Tout ouvrir<span class="material-symbols-outlined text-base">fast_forward</span></button>
+    </div>
     <div id="rCartes" class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full">
-      <div id="cardSalaire" class="rounded-2xl bg-[#2e1047] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
+      <div id="cardSalaire" data-titre-coffre="Salaire" class="order-2 relative rounded-2xl bg-[#2e1047] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
         <div class="flex items-center justify-between pb-2 border-b-[2.5px] border-black/40">
           <span class="text-xs font-lucky text-[#ffe600] uppercase tracking-wider">Rémunération</span>
           <div class="w-8 h-8 rounded-lg bg-[#ffe600] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_#000] rotate-3"><span class="material-symbols-outlined text-lg">payments</span></div>
@@ -823,7 +794,7 @@
           <span class="material-symbols-outlined text-sm">trending_up</span><span id="rSalaireNote"></span>
         </div>
       </div>
-      <div id="cardDynamique" class="rounded-2xl bg-[#ff2a85] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
+      <div id="cardDynamique" data-titre-coffre="Métier" class="order-1 relative rounded-2xl bg-[#ff2a85] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
         <div class="flex items-center justify-between pb-2 border-b-[2.5px] border-black">
           <span class="text-xs font-lucky text-white uppercase tracking-wider [text-shadow:_1px_1px_0_#000]" id="rDynLabel">Dynamique</span>
           <div class="w-8 h-8 rounded-lg bg-white border-2 border-black flex items-center justify-center text-[#ff2a85] shadow-[2px_2px_0_#000] -rotate-3"><span id="rDynIcone" class="material-symbols-outlined text-lg">rocket_launch</span></div>
@@ -836,7 +807,7 @@
           <span class="material-symbols-outlined text-sm">verified</span><span id="rDynamiqueNote" class="bg-white/90 px-1.5 rounded border border-black"></span>
         </div>
       </div>
-      <div class="rounded-2xl bg-[#2e1047] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
+      <div id="cardCursus" data-titre-coffre="Études" class="order-3 relative rounded-2xl bg-[#2e1047] border-[3.5px] border-black p-4 flex flex-col justify-between shadow-[5px_5px_0_#000] hover:-translate-y-1 transition">
         <div class="flex items-center justify-between pb-2 border-b-[2.5px] border-black/40">
           <span class="text-xs font-lucky text-[#00f0ff] uppercase tracking-wider">Cursus</span>
           <div class="w-8 h-8 rounded-lg bg-[#00f0ff] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_#000] rotate-3"><span class="material-symbols-outlined text-lg">school</span></div>
@@ -852,7 +823,7 @@
     </div>
 
     <!-- Au quotidien (V4) : missions, image de l'anniversaire, qualités -->
-    <div id="rQuotidien" class="hidden w-full bg-[#1e0a30] rounded-2xl border-[3.5px] border-black p-4 shadow-[5px_5px_0_#000]">
+    <div id="rQuotidien" data-apres-coffres class="hidden w-full bg-[#1e0a30] rounded-2xl border-[3.5px] border-black p-4 shadow-[5px_5px_0_#000]">
       <div class="flex items-center gap-2 mb-3 pb-1 border-b-2 border-black/40">
         <span class="material-symbols-outlined text-[#ffe600] text-base">work</span>
         <span class="font-lucky text-sm uppercase tracking-wider text-white [text-shadow:_1px_1px_0_#000]">Au quotidien</span>
@@ -867,7 +838,7 @@
       <p id="rQualites" class="hidden mt-3 text-xs font-bold text-[#FFAEDB]"></p>
     </div>
 
-    <div class="w-full bg-[#1e0a30] rounded-2xl border-[3.5px] border-black p-4 shadow-[5px_5px_0_#000]">
+    <div data-apres-coffres class="w-full bg-[#1e0a30] rounded-2xl border-[3.5px] border-black p-4 shadow-[5px_5px_0_#000]">
       <div class="flex items-center justify-between mb-2.5 pb-1 border-b-2 border-black/40">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-[#ffe600] text-base">timeline</span>
@@ -878,13 +849,13 @@
       <div id="rTrajectoire" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1"></div>
     </div>
 
-    <div id="rCompetences" class="flex flex-wrap items-center justify-center gap-2 pt-1"></div>
-    <p id="rVoisin" class="hidden text-sm font-bold text-white/80 flex items-center gap-1.5">
+    <div id="rCompetences" data-apres-coffres class="flex flex-wrap items-center justify-center gap-2 pt-1"></div>
+    <p id="rVoisin" data-apres-coffres class="hidden text-sm font-bold text-white/80 flex items-center gap-1.5">
       <span class="material-symbols-outlined text-base text-[#00f0ff]">explore</span>
       <span>Métier voisin à explorer : <span id="rVoisinNom" class="font-lucky text-[#FFE600] uppercase tracking-wide"></span></span>
     </p>
 
-    <div class="w-full max-w-sm flex flex-col items-center gap-3 pt-2 pb-2">
+    <div data-apres-coffres class="w-full max-w-sm flex flex-col items-center gap-3 pt-2 pb-2">
       <button id="replayBtn" type="button" class="group relative w-full flex items-center justify-center gap-3 py-3.5 px-8 rounded-2xl bg-gradient-to-r from-[#ff5e00] via-[#ff2a85] to-[#ffd200] border-[4px] border-black shadow-[6px_6px_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-[2px_2px_0_#000] transition-all -skew-x-6 hover:skew-x-0">
         <span id="rReplayIcone" class="material-symbols-outlined text-3xl font-black text-black transition-transform group-hover:rotate-180">replay</span>
         <span id="rReplayTxt" class="font-lucky text-2xl tracking-wider uppercase text-black">Rejouer</span>
