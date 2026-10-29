@@ -179,8 +179,119 @@ def metier_propre(m):
     return fiche
 
 
+# ---------- Format V7 (matrice de probabilités, app/data/orientech_v7.json)
+
+ECHELLE_V7 = (0.05, 0.15, 0.30, 0.50, 0.70, 0.85, 0.95)
+# paramètre -> (min, max, entier ?)
+BORNES_V7 = {"epsilon": (0, 0.5, False), "seuil_arret": (0.3, 0.99, False), "ratio_arret": (1, 10, False),
+             "temperature": (0, 1, False), "top_k": (1, 10, True), "min_questions": (1, 40, True),
+             "max_questions": (1, 40, True), "cible_questions": (1, 40, True), "penalite_deja_vu": (1, 10, False),
+             "parties_memorisees": (0, 10, True)}
+
+
+def parametres_v7_propres(p):
+    if not isinstance(p, dict):
+        raise Erreur(400, "parametres_moteur manquants.")
+    propres = {}
+    for cle, (mini, maxi, ent) in BORNES_V7.items():
+        v = p.get(cle)
+        if not nombre(v) or not mini <= v <= maxi or (ent and v != int(v)):
+            raise Erreur(400, f"Paramètre {cle} invalide (attendu entre {mini} et {maxi}).")
+        propres[cle] = int(v) if ent else v
+    if propres["min_questions"] > propres["max_questions"]:
+        raise Erreur(400, "min_questions doit être inférieur ou égal à max_questions.")
+    tours = p.get("tours_centre_interet", [])
+    if not isinstance(tours, list) or len(tours) > 10 or not all(nombre(t) and t == int(t) and 1 <= t <= 40 for t in tours):
+        raise Erreur(400, "tours_centre_interet invalide.")
+    propres["tours_centre_interet"] = [int(t) for t in tours]
+    return propres
+
+
+def deux_textes(v, qid, nom, obligatoire):
+    if not isinstance(v, list) or len(v) != 2 or not all(isinstance(t, str) for t in v):
+        raise Erreur(400, f"La question {qid} doit avoir 2 {nom}.")
+    if any(len(t) > 300 for t in v):
+        raise Erreur(400, f"La question {qid} a des {nom} de plus de 300 caractères.")
+    if obligatoire and not all(t.strip() for t in v):
+        raise Erreur(400, f"La question {qid} a des {nom} vides.")
+    return [t.strip() for t in v]
+
+
+def booleen(v, qid, nom):
+    if not isinstance(v, bool):
+        raise Erreur(400, f"La question {qid} : {nom} doit valoir true ou false.")
+    return v
+
+
+def question_v7_propre(q, ids_metiers):
+    if not isinstance(q, dict) or not ID_RE.match(str(q.get("id", ""))):
+        raise Erreur(400, "Question sans identifiant valide.")
+    qid = q["id"]
+    proches = q.get("proches")
+    if not isinstance(proches, list) or len(proches) > 100 or not all(isinstance(x, str) and ID_RE.match(x) for x in proches):
+        raise Erreur(400, f"La question {qid} a une liste « proches » invalide.")
+    if not isinstance(q.get("groupe"), str) or not ID_RE.match(q["groupe"]):
+        raise Erreur(400, f"La question {qid} a un groupe invalide.")
+    ci = q.get("centre_interet")
+    p = q.get("p") if isinstance(q.get("p"), dict) else {}
+    propre_p = {}
+    for mid in ids_metiers:
+        v = p.get(mid)
+        if not nombre(v) or not any(abs(v - e) < 1e-9 for e in ECHELLE_V7):
+            raise Erreur(400, f"La question {qid} : p[{mid}] doit être une valeur de l'échelle {list(ECHELLE_V7)}.")
+        propre_p[mid] = v
+    return {"id": qid, "formulations": deux_textes(q.get("formulations"), qid, "formulations", True),
+            "exemples": deux_textes(q.get("exemples"), qid, "exemples", False),
+            "type": texte(q.get("type"), 20), "theme_vie": texte(q.get("theme_vie"), 40),
+            "dimension_principale": texte(q.get("dimension_principale"), 20), "groupe": q["groupe"],
+            "proches": proches, "ouverture": booleen(q.get("ouverture"), qid, "ouverture"),
+            "centre_interet": texte(ci, 40) if isinstance(ci, str) else None,
+            "inversee": booleen(q.get("inversee"), qid, "inversee"), "p": propre_p}
+
+
+def donnees_v7_propres(d):
+    """{version: '7.x', metiers: {fiches}, matrice: <JSON allégé de orientech_v7/exporter_app.py>}"""
+    fiches, mat = d.get("metiers"), d.get("matrice")
+    if not isinstance(fiches, dict) or not isinstance(mat, dict) or not isinstance(mat.get("metiers"), list) \
+            or not isinstance(mat.get("questions"), list):
+        raise Erreur(400, "Format V7 attendu : {version, metiers: {...}, matrice: {metiers: [...], questions: [...]}}")
+    if len(fiches) > 200 or len(mat["metiers"]) > 200 or len(mat["questions"]) > 400:
+        raise Erreur(400, "Trop de métiers ou de questions.")
+    metiers = {}
+    for mid, m in fiches.items():
+        if not ID_RE.match(mid):
+            raise Erreur(400, f"Identifiant de métier invalide : {mid[:20]}")
+        metiers[mid] = metier_propre(m)
+    liste = []
+    for m in mat["metiers"]:
+        if not isinstance(m, dict) or m.get("id") not in metiers or any(x["id"] == m["id"] for x in liste):
+            raise Erreur(400, "Chaque métier de la matrice doit avoir une fiche, une seule fois.")
+        fam = m.get("famille_principale")
+        liste.append({"id": m["id"], "nom": texte(m.get("nom"), 60).strip() or metiers[m["id"]]["nom"],
+                      "famille_principale": fam if isinstance(fam, str) and ID_RE.match(fam) else ""})
+    if len(liste) != len(metiers):
+        raise Erreur(400, "Chaque fiche doit avoir sa colonne dans la matrice.")
+    familles = [{"id": f["id"], "nom": texte(f.get("nom"), 80)} for f in (mat.get("familles") or [])[:30]
+                if isinstance(f, dict) and isinstance(f.get("id"), str) and ID_RE.match(f["id"])]
+    questions, vus = [], set()
+    for q in mat["questions"]:
+        propre = question_v7_propre(q, [m["id"] for m in liste])
+        if propre["id"] in vus:
+            raise Erreur(400, f"Question en double : {propre['id']}")
+        vus.add(propre["id"])
+        questions.append(propre)
+    if len(metiers) < 2 or not questions:
+        raise Erreur(400, "Il faut au moins 2 métiers et 1 question.")
+    version = texte(d.get("version"), 10)
+    matrice = {"version": version, "echelle": list(ECHELLE_V7), "parametres_moteur": parametres_v7_propres(mat.get("parametres_moteur")),
+               "familles": familles, "metiers": liste, "questions": questions}
+    return {"version": version, "metiers": metiers, "matrice": matrice, "enregistre": time.time()}
+
+
 def donnees_propres(d):
     """Fiches + matrice envoyées par l'admin (même format que son export JSON)."""
+    if isinstance(d.get("version"), str) and d["version"].startswith("7"):
+        return donnees_v7_propres(d)
     if not isinstance(d.get("metiers"), dict) or not isinstance(d.get("questions"), list):
         raise Erreur(400, "Format attendu : {metiers: {...}, questions: [...]}")
     if len(d["metiers"]) > 200 or len(d["questions"]) > 400:
@@ -340,7 +451,8 @@ def route_admin(methode, parts, corps, mdp):
     if methode == "POST" and parts == ["admin", "donnees"]:
         donnees = donnees_propres(corps)
         ecrire_json(FICHIER_DONNEES, donnees)
-        return 200, {"ok": True, "metiers": len(donnees["metiers"]), "questions": len(donnees["questions"])}
+        questions = donnees["matrice"]["questions"] if "matrice" in donnees else donnees["questions"]
+        return 200, {"ok": True, "metiers": len(donnees["metiers"]), "questions": len(questions)}
     if methode == "POST" and parts == ["admin", "donnees", "reinitialiser"]:
         donnees = None
         FICHIER_DONNEES.unlink(missing_ok=True)

@@ -110,8 +110,107 @@ function metierPropre(m) {
   return fiche;
 }
 
+// ---------- Format V7 (matrice de probabilités, app/data/orientech_v7.json) — mêmes règles que serveur.py
+
+const ECHELLE_V7 = [0.05, 0.15, 0.30, 0.50, 0.70, 0.85, 0.95];
+// paramètre -> [min, max, entier ?]
+const BORNES_V7 = { epsilon: [0, 0.5, false], seuil_arret: [0.3, 0.99, false], ratio_arret: [1, 10, false],
+  temperature: [0, 1, false], top_k: [1, 10, true], min_questions: [1, 40, true], max_questions: [1, 40, true],
+  cible_questions: [1, 40, true], penalite_deja_vu: [1, 10, false], parties_memorisees: [0, 10, true] };
+
+function parametresV7Propres(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Erreur(400, 'parametres_moteur manquants.');
+  const propres = {};
+  for (const [cle, [min, max, ent]] of Object.entries(BORNES_V7)) {
+    const v = p[cle];
+    if (!nombre(v) || v < min || v > max || (ent && !Number.isInteger(v))) throw new Erreur(400, `Paramètre ${cle} invalide (attendu entre ${min} et ${max}).`);
+    propres[cle] = v;
+  }
+  if (propres.min_questions > propres.max_questions) throw new Erreur(400, 'min_questions doit être inférieur ou égal à max_questions.');
+  const tours = p.tours_centre_interet ?? [];
+  if (!Array.isArray(tours) || tours.length > 10 || !tours.every((t) => Number.isInteger(t) && t >= 1 && t <= 40)) {
+    throw new Erreur(400, 'tours_centre_interet invalide.');
+  }
+  propres.tours_centre_interet = tours;
+  return propres;
+}
+
+function deuxTextes(v, qid, nom, obligatoire) {
+  if (!Array.isArray(v) || v.length !== 2 || !v.every((t) => typeof t === 'string')) throw new Erreur(400, `La question ${qid} doit avoir 2 ${nom}.`);
+  if (v.some((t) => t.length > 300)) throw new Erreur(400, `La question ${qid} a des ${nom} de plus de 300 caractères.`);
+  if (obligatoire && !v.every((t) => t.trim())) throw new Erreur(400, `La question ${qid} a des ${nom} vides.`);
+  return v.map((t) => t.trim());
+}
+
+function booleen(v, qid, nom) {
+  if (typeof v !== 'boolean') throw new Erreur(400, `La question ${qid} : ${nom} doit valoir true ou false.`);
+  return v;
+}
+
+function questionV7Propre(q, idsMetiers) {
+  if (!q || typeof q !== 'object' || !ID_RE.test(String(q.id || ''))) throw new Erreur(400, 'Question sans identifiant valide.');
+  const qid = q.id;
+  if (!Array.isArray(q.proches) || q.proches.length > 100 || !q.proches.every((x) => typeof x === 'string' && ID_RE.test(x))) {
+    throw new Erreur(400, `La question ${qid} a une liste « proches » invalide.`);
+  }
+  if (typeof q.groupe !== 'string' || !ID_RE.test(q.groupe)) throw new Erreur(400, `La question ${qid} a un groupe invalide.`);
+  const p = objet(q.p);
+  const propreP = {};
+  for (const mid of idsMetiers) {
+    const v = p[mid];
+    if (!nombre(v) || !ECHELLE_V7.some((e) => Math.abs(v - e) < 1e-9)) {
+      throw new Erreur(400, `La question ${qid} : p[${mid}] doit être une valeur de l'échelle [${ECHELLE_V7.join(', ')}].`);
+    }
+    propreP[mid] = v;
+  }
+  return { id: qid, formulations: deuxTextes(q.formulations, qid, 'formulations', true), exemples: deuxTextes(q.exemples, qid, 'exemples', false),
+    type: texte(q.type, 20), theme_vie: texte(q.theme_vie, 40), dimension_principale: texte(q.dimension_principale, 20), groupe: q.groupe,
+    proches: q.proches, ouverture: booleen(q.ouverture, qid, 'ouverture'),
+    centre_interet: typeof q.centre_interet === 'string' ? texte(q.centre_interet, 40) : null,
+    inversee: booleen(q.inversee, qid, 'inversee'), p: propreP };
+}
+
+// {version: '7.x', metiers: {fiches}, matrice: <JSON allégé de orientech_v7/exporter_app.py>}
+function donneesV7Propres(d) {
+  const fiches = d.metiers, mat = d.matrice;
+  if (!fiches || typeof fiches !== 'object' || Array.isArray(fiches) || !mat || typeof mat !== 'object' ||
+      !Array.isArray(mat.metiers) || !Array.isArray(mat.questions)) {
+    throw new Erreur(400, 'Format V7 attendu : {version, metiers: {...}, matrice: {metiers: [...], questions: [...]}}');
+  }
+  if (Object.keys(fiches).length > 200 || mat.metiers.length > 200 || mat.questions.length > 400) throw new Erreur(400, 'Trop de métiers ou de questions.');
+  const metiers = {};
+  for (const [mid, m] of Object.entries(fiches)) {
+    if (!ID_RE.test(mid)) throw new Erreur(400, `Identifiant de métier invalide : ${mid.slice(0, 20)}`);
+    metiers[mid] = metierPropre(m);
+  }
+  const liste = [];
+  for (const m of mat.metiers) {
+    if (!m || typeof m !== 'object' || !Object.hasOwn(metiers, m.id) || liste.some((x) => x.id === m.id)) {
+      throw new Erreur(400, 'Chaque métier de la matrice doit avoir une fiche, une seule fois.');
+    }
+    const fam = m.famille_principale;
+    liste.push({ id: m.id, nom: texte(m.nom, 60).trim() || metiers[m.id].nom,
+      famille_principale: typeof fam === 'string' && ID_RE.test(fam) ? fam : '' });
+  }
+  if (liste.length !== Object.keys(metiers).length) throw new Erreur(400, 'Chaque fiche doit avoir sa colonne dans la matrice.');
+  const familles = (Array.isArray(mat.familles) ? mat.familles : []).slice(0, 30)
+    .filter((f) => f && typeof f.id === 'string' && ID_RE.test(f.id)).map((f) => ({ id: f.id, nom: texte(f.nom, 80) }));
+  const vus = new Set();
+  const questions = mat.questions.map((q) => {
+    const propre = questionV7Propre(q, liste.map((m) => m.id));
+    if (vus.has(propre.id)) throw new Erreur(400, `Question en double : ${propre.id}`);
+    vus.add(propre.id);
+    return propre;
+  });
+  if (Object.keys(metiers).length < 2 || !questions.length) throw new Erreur(400, 'Il faut au moins 2 métiers et 1 question.');
+  const version = texte(d.version, 10);
+  const matrice = { version, echelle: [...ECHELLE_V7], parametres_moteur: parametresV7Propres(mat.parametres_moteur), familles, metiers: liste, questions };
+  return { version, metiers, matrice, enregistre: Date.now() / 1000 };
+}
+
 // Fiches + matrice envoyées par l'admin (même format que son export JSON)
 function donneesPropres(d) {
+  if (typeof d.version === 'string' && d.version.startsWith('7')) return donneesV7Propres(d);
   if (!d.metiers || typeof d.metiers !== 'object' || Array.isArray(d.metiers) || !Array.isArray(d.questions)) {
     throw new Erreur(400, 'Format attendu : {metiers: {...}, questions: [...]}');
   }
@@ -258,7 +357,7 @@ async function routeAdmin(methode, parts, corps, mdp) {
   if (methode === 'POST' && chemin === 'admin/donnees') {
     const d = donneesPropres(corps);
     await redis('SET', CLE_DONNEES, JSON.stringify(d));
-    return [200, { ok: true, metiers: Object.keys(d.metiers).length, questions: d.questions.length }];
+    return [200, { ok: true, metiers: Object.keys(d.metiers).length, questions: (d.matrice || d).questions.length }];
   }
   if (methode === 'POST' && chemin === 'admin/donnees/reinitialiser') {
     await redis('DEL', CLE_DONNEES);

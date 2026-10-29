@@ -655,6 +655,7 @@
     <div class="flex flex-wrap gap-2">
       <button id="aAnnuler" type="button" class="admin-btn bg-white"><span class="material-symbols-outlined text-base">undo</span>Tout annuler</button>
       <button id="aExporter" type="button" class="admin-btn bg-[#00E5FF]"><span class="material-symbols-outlined text-base">download</span>Exporter</button>
+      <button id="aExporterV7" type="button" class="admin-btn bg-[#00E5FF] hidden" title="Matrice au format orientech_v7_matrice.json, à réinjecter dans la chaîne Python (orientech_v7/)"><span class="material-symbols-outlined text-base">data_object</span>Exporter le JSON V7</button>
       <button id="aEnregistrer" type="button" class="admin-btn bg-[#FFE600]"><span class="material-symbols-outlined text-base">save</span>Enregistrer</button>
       <button id="aReinitialiser" type="button" class="admin-btn bg-[#2e1047] !text-white" title="Supprime les données enregistrées : le jeu relit le fichier Excel"><span class="material-symbols-outlined text-base">restart_alt</span>Revenir à l'Excel</button>
     </div>
@@ -689,7 +690,7 @@
 
   <section data-panneau="matrice" class="hidden carte-form !pt-6">
     <span class="carte-titre">Matrice nœuds × métiers</span>
-    <p class="text-xs font-bold text-white/70">Clique une case pour changer ce que le métier répond : <span class="px-1.5 rounded bg-[#00FF9D] text-black">O</span> oui → <span class="px-1.5 rounded bg-[#FF2A85]">N</span> non → <span class="px-1.5 rounded bg-white/10">?</span> indifférent.</p>
+    <p id="aMatriceAide" class="text-xs font-bold text-white/70">Clique une case pour changer ce que le métier répond : <span class="px-1.5 rounded bg-[#00FF9D] text-black">O</span> oui → <span class="px-1.5 rounded bg-[#FF2A85]">N</span> non → <span class="px-1.5 rounded bg-white/10">?</span> indifférent.</p>
     <div class="overflow-auto max-h-[65vh] border-[3px] border-black rounded-xl">
       <table id="aMatrice" class="border-collapse text-xs"></table>
     </div>
@@ -967,6 +968,7 @@
 
 <script src="vendor/xlsx.full.min.js"></script><!-- SheetJS 0.18.5, hébergé avec le site -->
 <script src="moteur.js"></script>
+<script src="moteur_v7.js"></script>
 <script src="prof.js"></script>
 <script src="pro.js"></script>
 <script src="fiches.js"></script>

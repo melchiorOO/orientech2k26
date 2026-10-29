@@ -1,4 +1,5 @@
-// ORIENTech — interface du jeu. La logique de choix est dans moteur.js, les données dans data/orientech.xlsx.
+// ORIENTech — interface du jeu. La logique de choix est dans moteur_v7.js (repli V6 : moteur.js),
+// les données dans data/orientech_v7.json + data/ORIENTech_V6_100_questions.xlsx (repli : data/orientech.xlsx).
 (async function () {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -14,7 +15,7 @@
     document.body.appendChild(alerte);
   }
 
-  // Données du jeu : celles enregistrées par l'admin (serveur) si elles existent, sinon le fichier Excel
+  // Données du jeu, par ordre de priorité : celles enregistrées par l'admin (serveur), la matrice V7, l'Excel V6
   const VALEUR = { O: 1, N: -1 };
   async function donneesAdmin() {
     try {
@@ -22,25 +23,63 @@
       if (!r.ok) return null;
       const { donnees } = await r.json();
       if (!donnees) return null;
+      if (String(donnees.version || '').startsWith('7')) return MoteurV7.lireV7(donnees.matrice, donnees.metiers);
       return { metiers: donnees.metiers, questions: donnees.questions.map((q) => ({
         ...q, profils: Object.fromEntries(Object.entries(q.profils).map(([m, v]) => [m, VALEUR[v] || 0])) })) };
-    } catch (err) { // pas de serveur (site statique, hors ligne…) : on prend l'Excel
-      console.warn('[ORIENTech] données enregistrées indisponibles, lecture du fichier Excel', err);
+    } catch (err) { // pas de serveur (site statique, hors ligne…) : on prend les fichiers
+      console.warn('[ORIENTech] données enregistrées indisponibles, lecture des fichiers', err);
+      return null;
+    }
+  }
+
+  async function telecharger(url, lire) {
+    const reponse = await fetch(url, { cache: 'no-store' });
+    if (!reponse.ok) throw new Error(`${url} : HTTP ${reponse.status}`);
+    return lire(reponse);
+  }
+  const lireExcel = async (r) => Moteur.lireClasseur(XLSX, XLSX.read(await r.arrayBuffer()));
+
+  // Matrice V7 (probabilités) + les 30 fiches métiers de l'Excel V6
+  async function donneesV7() {
+    try {
+      const [json, fiches] = await Promise.all([
+        telecharger('data/orientech_v7.json', (r) => r.json()),
+        telecharger('data/ORIENTech_V6_100_questions.xlsx', lireExcel)
+      ]);
+      return MoteurV7.lireV7(json, fiches.metiers);
+    } catch (err) {
+      console.warn('[ORIENTech] matrice V7 indisponible, repli sur data/orientech.xlsx', err);
       return null;
     }
   }
 
   let base;
   try {
-    base = await donneesAdmin();
-    if (!base) {
-      const reponse = await fetch('data/orientech.xlsx', { cache: 'no-store' });
-      if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-      base = Moteur.lireClasseur(XLSX, XLSX.read(await reponse.arrayBuffer()));
-    }
+    base = (await donneesAdmin()) || (await donneesV7()) || (await telecharger('data/orientech.xlsx', lireExcel));
     if (!base.questions.length || !Object.keys(base.metiers).length) throw new Error('aucune question ou aucun métier dans le fichier');
   } catch (err) {
     return erreurChargement(err);
+  }
+  const M = base.format === 'v7' ? MoteurV7 : Moteur;
+
+  // Mémoire inter-parties (V7) : ids des questions des 2 dernières parties, par prénom si on le connaît
+  const CLE_VUES = 'orientech_v7_vues';
+  const cleVues = () => (contexte.prenom ? `${CLE_VUES}:${contexte.prenom.toLowerCase()}` : CLE_VUES);
+  function questionsVues() {
+    try {
+      const parties = JSON.parse(localStorage.getItem(cleVues())) || [];
+      return Array.isArray(parties) ? parties.flat().filter((id) => typeof id === 'string') : [];
+    } catch (e) { return []; } // stockage refusé ou illisible : pas de mémoire
+  }
+  // remplacer = la même partie se termine une 2e fois (après « pas convaincu·e ») : on met à jour sa trace
+  function memoriserPartie(idsQuestions, remplacer) {
+    try {
+      let parties = JSON.parse(localStorage.getItem(cleVues())) || [];
+      if (!Array.isArray(parties)) parties = [];
+      if (remplacer) parties = parties.slice(0, -1);
+      const garder = (base.parametres && base.parametres.parties_memorisees) || 2;
+      localStorage.setItem(cleVues(), JSON.stringify([...parties, idsQuestions].slice(-garder)));
+    } catch (e) { /* stockage refusé : pas grave */ }
   }
 
   let partie = null;
@@ -110,7 +149,7 @@
     if (!repondable || ecran !== 'question') return;
     repondable = false;
     partie.repondre(current.id, oui);
-    journal.push({ texte: current.texte, oui });
+    journal.push({ id: current.id, texte: current.texte, oui });
     if (partie.estFinie()) {
       signaler(partie.classement()[0].id);
       return revealMetier(partie.classement()[0].id);
@@ -180,7 +219,13 @@
   let metierPropose = null;    // métier affiché à la fin de la partie
   let metierAvantBonus = null; // métier refusé par l'élève avant ses 5 questions bonus
 
+  let partieMemorisee = false; // la partie en cours a déjà sa trace dans la mémoire inter-parties
+
   function revealMetier(id) {
+    if (base.format === 'v7') {
+      memoriserPartie(journal.map((j) => j.id), partieMemorisee);
+      partieMemorisee = true;
+    }
     const thinking = $('thinking');
     thinking.classList.replace('hidden', 'flex');
     setTimeout(() => {
@@ -301,7 +346,8 @@
   }
 
   function start() {
-    partie = Moteur.creerPartie(base);
+    partie = M.creerPartie(base, base.format === 'v7' ? { dejaVues: questionsVues() } : undefined);
+    partieMemorisee = false;
     journal = [];
     metierPropose = metierAvantBonus = null;
     askQuestion(partie.prochaineQuestion());
@@ -446,7 +492,8 @@
     if (precedente) {
       journal.pop();
       signaler();
-      askQuestion(base.questions.find((q) => q.id === precedente.id));
+      // V7 : la question annulée revient avec la formulation (A ou B) déjà montrée
+      askQuestion(base.format === 'v7' ? partie.prochaineQuestion() : base.questions.find((q) => q.id === precedente.id));
     }
   };
   $('rightBtn').onclick = () => (ECRANS_FERMABLES.includes(ecran) ? goHome() : ouvrirFiches());

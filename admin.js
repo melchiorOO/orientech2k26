@@ -1,6 +1,6 @@
 // ORIENTech — page admin : fiches métiers, nœuds de la toile (affirmations) et leur outcome (ce que chaque métier répond).
-// FRONT-END SEULEMENT : les modifications s'appliquent tout de suite au jeu dans ce navigateur (jusqu'au rechargement),
-// "Exporter" télécharge le résultat en JSON, "Enregistrer" est à brancher sur serveur.py.
+// Les modifications s'appliquent tout de suite au jeu dans ce navigateur ; "Enregistrer" les publie sur le serveur.
+// Deux formats : V6 (cases O / N / ?) et V7 (base.format === 'v7' : probabilités de OUI sur une échelle à 7 niveaux).
 (function (racine) {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -9,6 +9,24 @@
   const LETTRE = { 1: 'O', '-1': 'N', 0: '?' };
   const SUIVANT = { 1: -1, '-1': 0, 0: 1 }; // O -> N -> ? -> O
   const COULEUR = { 1: 'bg-[#00FF9D] text-black', '-1': 'bg-[#FF2A85] text-white', 0: 'bg-white/10 text-white/50' };
+
+  // ---------- V7 : probabilités de OUI (mêmes couleurs que l'Excel : rouge 0.05 → blanc 0.50 → vert 0.95)
+  const ECHELLE = [0.05, 0.15, 0.30, 0.50, 0.70, 0.85, 0.95];
+  const THEMES_V7 = ['École', 'Maison', 'Sport', 'Jeux et écrans', 'Amis et sorties', 'Loisirs créatifs', 'Nature et dehors'];
+  const estV7 = () => !!base && base.format === 'v7';
+  const pV7 = (q, id) => q.p[id] ?? 0.5;
+  const suivantV7 = (p) => ECHELLE[(ECHELLE.findIndex((e) => Math.abs(e - p) < 1e-9) + 1) % ECHELLE.length]; // 0.95 -> 0.05
+  const signeV7 = (p) => (p >= 0.7 ? 1 : p <= 0.3 ? -1 : 0); // plutôt oui / plutôt non / sans lien
+  const valeurV7 = (p) => p.toFixed(2).slice(1); // 0.85 -> ".85"
+  const melange = (a, b, t) => a.map((x, i) => Math.round(x + (b[i] - x) * t));
+  function fondV7(p) {
+    const rgb = p < 0.5 ? melange([248, 105, 107], [255, 255, 255], (p - 0.05) / 0.45) : melange([255, 255, 255], [99, 190, 123], (p - 0.5) / 0.45);
+    return `background:rgb(${rgb.join(',')});color:#000`;
+  }
+  const AIDE_V6 = $('aMatriceAide').innerHTML;
+  const AIDE_V7 = `Chaque case = probabilité qu'un·e élève fait·e pour ce métier réponde OUI. Clique pour passer au niveau suivant :
+    ${ECHELLE.map((p) => `<span class="px-1.5 rounded" style="${fondV7(p)}">${valeurV7(p)}</span>`).join(' → ')} → .05.
+    Les groupes et les questions proches ne sont pas recalculés par l'admin.`;
 
   // Champs éditables d'une fiche : [clé, libellé, type] ; type "liste" = valeurs séparées par « ; »
   const CHAMPS = [
@@ -80,7 +98,8 @@
     }
     const valeur = (k, type) => (type === 'liste' ? (m[k] || []).join(' ; ') : m[k] || '');
     const compte = { 1: 0, '-1': 0, 0: 0 };
-    base.questions.forEach((q) => compte[q.profils[ficheSel] || 0]++);
+    base.questions.forEach((q) => compte[estV7() ? signeV7(pV7(q, ficheSel)) : q.profils[ficheSel] || 0]++);
+    const [oui, non, neutre] = estV7() ? ['plutôt Oui (≥ .70)', 'plutôt Non (≤ .30)', 'sans lien'] : ['Oui', 'Non', '?'];
     ed.innerHTML = `
       <span class="carte-titre">Fiche : ${esc(m.nom)}</span>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -97,9 +116,9 @@
         <button type="button" id="aAjoutEtape" class="admin-btn bg-white mt-2"><span class="material-symbols-outlined text-base">add</span>Étape</button>
       </div>
       <p class="text-xs font-bold text-white/70">Dans la toile, ce métier répond
-        <span class="px-1.5 rounded bg-[#00FF9D] text-black">${compte[1]} Oui</span>
-        <span class="px-1.5 rounded bg-[#FF2A85]">${compte[-1]} Non</span>
-        <span class="px-1.5 rounded bg-white/10">${compte[0]} ?</span> — modifiable dans l'onglet Matrice ou Nœuds.</p>
+        <span class="px-1.5 rounded bg-[#00FF9D] text-black">${compte[1]} ${oui}</span>
+        <span class="px-1.5 rounded bg-[#FF2A85]">${compte[-1]} ${non}</span>
+        <span class="px-1.5 rounded bg-white/10">${compte[0]} ${neutre}</span> — modifiable dans l'onglet Matrice ou Nœuds.</p>
       <div class="flex flex-wrap gap-2 justify-between">
         <button type="button" id="aVoirFiche" class="admin-btn bg-[#00E5FF]"><span class="material-symbols-outlined text-base">visibility</span>Voir comme un élève</button>
         <button type="button" id="aSupprFiche" class="admin-btn bg-[#FF2A85] !text-white"><span class="material-symbols-outlined text-base">delete</span>Supprimer ce métier</button>
@@ -122,7 +141,7 @@
     $('aSupprFiche').onclick = () => {
       if (!confirm(`Supprimer « ${m.nom} » ? Il disparaîtra aussi de la matrice.`)) return;
       delete base.metiers[ficheSel];
-      base.questions.forEach((q) => delete q.profils[ficheSel]);
+      base.questions.forEach((q) => delete (estV7() ? q.p : q.profils)[ficheSel]);
       ficheSel = null; marquer(); rendreListeFiches(); rendreFiche();
     };
   }
@@ -152,7 +171,8 @@
     const id = 'NOUV' + n;
     base.metiers[id] = { nom: `Nouveau métier ${n}`, code: '', description: '', bacs: [], competences: [], missions: [],
       trajectoire: [{ etape: 'Lieu de travail', detail: '', cible: true }] };
-    base.questions.forEach((q) => (q.profils[id] = 0)); // répond « ? » partout tant qu'on ne l'a pas réglé
+    // répond « ? » (V7 : 0.50) partout tant qu'on ne l'a pas réglé
+    base.questions.forEach((q) => (estV7() ? (q.p[id] = 0.5) : (q.profils[id] = 0)));
     ficheSel = id; marquer(); rendreListeFiches(); rendreFiche();
   };
 
@@ -164,7 +184,7 @@
     $('aNoeudsListe').innerHTML = base.questions
       .filter((q) => !cherche || `${q.id} ${q.texte} ${q.theme || ''}`.toLowerCase().includes(cherche))
       .map((q) => {
-        const vals = Object.values(q.profils);
+        const vals = estV7() ? Object.values(q.p).map(signeV7) : Object.values(q.profils);
         const inutile = !vals.includes(1) || !vals.includes(-1);
         return `<button type="button" class="admin-item" data-noeud="${esc(q.id)}" ${q.id === noeudSel ? 'data-actif' : ''}>
           <span class="font-lucky text-[10px] px-1.5 rounded bg-black text-[#00E5FF] shrink-0">${esc(q.id)}</span>
@@ -182,6 +202,7 @@
       ed.innerHTML = `<span class="carte-titre">Nœud</span><p class="text-sm font-bold text-white/60">Choisis un nœud dans la liste pour modifier l'affirmation et son outcome.</p>`;
       return;
     }
+    if (estV7()) return rendreNoeudV7(q, ed);
     const ids = idsMetiers();
     const avecCodes = ids.length && ids.every((id) => /^[A-Z]{4}$/.test(base.metiers[id].code || ''));
     const vals = ids.map((id) => q.profils[id] || 0);
@@ -250,7 +271,97 @@
     };
   }
 
+  // V7 : deux formulations de même sens (tirées au hasard en jeu), thème de vie, ouverture ; groupes et proches en lecture seule
+  function rendreNoeudV7(q, ed) {
+    const ids = idsMetiers();
+    const vals = ids.map((id) => signeV7(pV7(q, id)));
+    const nb = (v) => vals.filter((x) => x === v).length;
+    const themes = [...new Set([...THEMES_V7, ...base.questions.map((x) => x.theme_vie).filter(Boolean)])];
+    const zone = (champ, k, label) => `<label><span class="etiquette">${label}</span>
+      <textarea data-v7="${champ}" data-k="${k}" rows="2" class="champ text-sm">${esc(q[champ][k])}</textarea></label>`;
+    const lecture = [['Groupe', q.groupe], ['Proches', (q.proches || []).join(', ') || 'aucune'],
+      ["Centre d'intérêt", q.centre_interet || 'non'], ['Tournure inversée', q.inversee ? 'oui' : 'non']];
+    ed.innerHTML = `
+      <span class="carte-titre">Nœud ${esc(q.id)}</span>
+      <p class="text-xs font-bold text-[#FFE600]">⚠️ Une formulation B doit avoir exactement le même sens que la A : le jeu tire l'une ou l'autre au hasard, avec l'exemple de même lettre.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${zone('formulations', 0, 'Formulation A')}${zone('formulations', 1, 'Formulation B')}
+        ${zone('exemples', 0, 'Exemple A (bouton 💡)')}${zone('exemples', 1, 'Exemple B (bouton 💡)')}
+        <label><span class="etiquette">Thème de vie</span>
+          <select id="aThemeV7" class="champ text-sm">${themes.map((t) => `<option ${t === q.theme_vie ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+        <label class="flex items-center gap-2 text-sm font-bold sm:mt-5"><input id="aOuvertureV7" type="checkbox" ${q.ouverture ? 'checked' : ''}>
+          Question d'ouverture (peut être la 1re question)</label>
+      </div>
+      <p class="text-xs font-bold text-white/70">${lecture.map(([k, v]) => `${k} : <span class="text-white">${esc(v)}</span>`).join(' · ')}
+        <br>Lecture seule : l'admin ne recalcule pas les groupes ni les questions proches (chaîne Python de orientech_v7/).</p>
+
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="etiquette !mb-0">Outcome : probabilité que chaque métier réponde OUI</span>
+          <span class="text-xs font-bold">
+            <span class="px-1.5 rounded bg-[#00FF9D] text-black">${nb(1)} ≥ .70</span>
+            <span class="px-1.5 rounded bg-[#FF2A85]">${nb(-1)} ≤ .30</span>
+            <span class="px-1.5 rounded bg-white/10">${nb(0)} entre les deux</span></span>
+        </div>
+        ${!nb(1) || !nb(-1) ? `<p class="text-xs font-bold text-[#FFE600]">⚠️ Ce nœud ne départage aucun métier : il faut au moins une case ≥ .70 et une ≤ .30.</p>` : ''}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          ${ids.map((id) => `<button type="button" data-outcome="${esc(id)}" class="flex items-center gap-2 rounded-lg border-[2.5px] border-black px-2 py-1 text-left text-xs font-bold" style="${fondV7(pV7(q, id))}">
+              <span class="font-lucky w-8 text-center">${valeurV7(pV7(q, id))}</span><span class="truncate">${esc(base.metiers[id].nom)}</span></button>`).join('')}
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <button type="button" data-tous="0.95" class="admin-btn bg-[#00FF9D]">Tous 0.95</button>
+          <button type="button" data-tous="0.05" class="admin-btn bg-[#FF2A85] !text-white">Tous 0.05</button>
+          <button type="button" data-tous="0.5" class="admin-btn bg-white">Tous 0.50</button>
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button type="button" id="aSupprNoeud" class="admin-btn bg-[#FF2A85] !text-white"><span class="material-symbols-outlined text-base">delete</span>Supprimer ce nœud</button>
+      </div>`;
+
+    ed.querySelectorAll('[data-v7]').forEach((el) => el.addEventListener('input', () => {
+      const champ = el.dataset.v7, k = +el.dataset.k;
+      q[champ][k] = el.value;
+      if (champ === 'formulations' && k === 0) { q.texte = el.value; rendreListeNoeuds(); } // texte = formulation A (pro, prof, listes)
+      if (champ === 'exemples' && k === 0) q.exemple = el.value;
+      marquer();
+    }));
+    $('aThemeV7').onchange = () => { q.theme_vie = q.theme = $('aThemeV7').value; marquer(); };
+    $('aOuvertureV7').onchange = () => { q.ouverture = $('aOuvertureV7').checked; marquer(); };
+    ed.querySelectorAll('[data-outcome]').forEach((b) => (b.onclick = () => {
+      q.p[b.dataset.outcome] = suivantV7(pV7(q, b.dataset.outcome)); marquer(); rendreNoeud(); rendreListeNoeuds();
+    }));
+    ed.querySelectorAll('[data-tous]').forEach((b) => (b.onclick = () => {
+      ids.forEach((id) => (q.p[id] = Number(b.dataset.tous))); marquer(); rendreNoeud(); rendreListeNoeuds();
+    }));
+    $('aSupprNoeud').onclick = () => {
+      if (!confirm(`Supprimer le nœud ${q.id} ?`)) return;
+      base.questions.splice(base.questions.indexOf(q), 1);
+      noeudSel = null; marquer(); rendreListeNoeuds(); rendreNoeud();
+    };
+  }
+
+  // V7 : p = 0.50 partout, nouveau groupe à lui seul, aucune question proche, pas d'ouverture
+  function nouveauNoeudV7() {
+    let n = 1;
+    while (noeud('Q' + String(n).padStart(3, '0'))) n++;
+    const groupes = new Set(base.questions.map((q) => q.groupe));
+    let g = 1;
+    while (groupes.has('G' + String(g).padStart(3, '0'))) g++;
+    const texte = 'Nouvelle affirmation…';
+    return { id: 'Q' + String(n).padStart(3, '0'), formulations: [texte, texte], exemples: ['', ''], type: '',
+      theme_vie: THEMES_V7[0], dimension_principale: '', groupe: 'G' + String(g).padStart(3, '0'), proches: [],
+      ouverture: false, centre_interet: null, inversee: false,
+      p: Object.fromEntries(Object.keys(base.metiers).map((id) => [id, 0.5])),
+      texte, exemple: '', theme: THEMES_V7[0] };
+  }
+
   $('aNouveauNoeud').onclick = () => {
+    if (estV7()) {
+      const q = nouveauNoeudV7();
+      base.questions.push(q);
+      noeudSel = q.id; marquer(); rendreListeNoeuds(); rendreNoeud();
+      return;
+    }
     let n = base.questions.length + 1;
     while (noeud('Q' + String(n).padStart(2, '0'))) n++;
     const q = { id: 'Q' + String(n).padStart(2, '0'), texte: 'Nouvelle affirmation…', exemple: '', theme: '', profils: {} };
@@ -264,6 +375,12 @@
   function rendreMatrice() {
     const ids = idsMetiers();
     const th = 'sticky top-0 z-10 bg-[#1A072E] border border-black/60';
+    $('aMatriceAide').innerHTML = estV7() ? AIDE_V7 : AIDE_V6;
+    const cellule = (q, id) => {
+      if (!estV7()) { const v = q.profils[id] || 0; return `<button type="button" class="cellule ${COULEUR[v]}" data-q="${esc(q.id)}" data-m="${esc(id)}">${LETTRE[v]}</button>`; }
+      const p = pV7(q, id);
+      return `<button type="button" class="cellule" style="${fondV7(p)}" title="${esc(base.metiers[id].nom)} : ${p}" data-q="${esc(q.id)}" data-m="${esc(id)}">${valeurV7(p)}</button>`;
+    };
     $('aMatrice').innerHTML = `
       <thead><tr>
         <th class="${th} left-0 z-20 text-left px-2 min-w-[18rem] font-lucky uppercase">Nœud</th>
@@ -273,13 +390,20 @@
       <tbody>${base.questions.map((q) => `<tr>
         <td class="sticky left-0 bg-[#2e1047] border border-black/60 px-2 py-1 max-w-[18rem] truncate" title="${esc(q.texte)}">
           <span class="font-lucky text-[#00E5FF] mr-1">${esc(q.id)}</span>${esc(q.texte)}</td>
-        ${ids.map((id) => { const v = q.profils[id] || 0; return `<td class="p-0"><button type="button" class="cellule ${COULEUR[v]}" data-q="${esc(q.id)}" data-m="${esc(id)}">${LETTRE[v]}</button></td>`; }).join('')}
+        ${ids.map((id) => `<td class="p-0">${cellule(q, id)}</td>`).join('')}
       </tr>`).join('')}</tbody>`;
   }
   $('aMatrice').addEventListener('click', (e) => {
     const b = e.target.closest('[data-q][data-m]');
     if (!b) return;
     const q = noeud(b.dataset.q);
+    if (estV7()) {
+      const p = (q.p[b.dataset.m] = suivantV7(pV7(q, b.dataset.m)));
+      b.setAttribute('style', fondV7(p));
+      b.title = `${base.metiers[b.dataset.m].nom} : ${p}`;
+      b.textContent = valeurV7(p);
+      return marquer();
+    }
     const v = (q.profils[b.dataset.m] = SUIVANT[q.profils[b.dataset.m] || 0]);
     b.className = `cellule ${COULEUR[v]}`;
     b.textContent = LETTRE[v];
@@ -299,7 +423,33 @@
     opts.toast('Modifications annulées');
   };
 
+  // V7 : la matrice au format de app/data/orientech_v7.json (et de orientech_v7_matrice.json, sans beta_prior ni dimensions)
+  function matriceV7() {
+    const connus = Object.fromEntries((base.metiersV7 || []).map((m) => [m.id, m]));
+    const idFamille = (nom) => (base.familles.find((f) => f.nom === nom) || {}).id || '';
+    const ids = [...(base.metiersV7 || []).map((m) => m.id).filter((id) => base.metiers[id]), ...Object.keys(base.metiers).filter((id) => !connus[id])];
+    return {
+      version: base.version, echelle: ECHELLE, parametres_moteur: base.parametres, familles: base.familles,
+      metiers: ids.map((id) => ({ id, nom: base.metiers[id].nom,
+        famille_principale: connus[id] ? connus[id].famille_principale : idFamille(base.metiers[id].famille) })),
+      questions: base.questions.map((q) => ({
+        id: q.id, formulations: q.formulations, exemples: q.exemples, type: q.type, theme_vie: q.theme_vie,
+        dimension_principale: q.dimension_principale, groupe: q.groupe, proches: q.proches, ouverture: q.ouverture,
+        centre_interet: q.centre_interet, inversee: q.inversee, p: Object.fromEntries(ids.map((id) => [id, pV7(q, id)]))
+      }))
+    };
+  }
+
+  const telechargerJSON = (objet, nom) => {
+    const blob = new Blob([JSON.stringify(objet, null, 1)], { type: 'application/json' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: nom });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    opts.toast('Export téléchargé');
+  };
+
   function exportJSON() {
+    if (estV7()) return { exporte: new Date().toISOString(), version: base.version, metiers: base.metiers, matrice: matriceV7() };
     return {
       exporte: new Date().toISOString(),
       metiers: base.metiers,
@@ -307,13 +457,9 @@
     };
   }
 
-  $('aExporter').onclick = () => {
-    const blob = new Blob([JSON.stringify(exportJSON(), null, 2)], { type: 'application/json' });
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'orientech_admin.json' });
-    a.click();
-    URL.revokeObjectURL(a.href);
-    opts.toast('Export téléchargé');
-  };
+  $('aExporter').onclick = () => telechargerJSON(exportJSON(), 'orientech_admin.json');
+  // à recopier dans orientech_v7/ pour relancer la simulation (moteur_reference.py) sur les modifications
+  $('aExporterV7').onclick = () => telechargerJSON(matriceV7(), 'orientech_v7_matrice_admin.json');
 
   // ---------- Serveur (mot de passe demandé une fois, gardé le temps de l'onglet du navigateur)
 
@@ -360,7 +506,8 @@
   };
 
   $('aReinitialiser').onclick = async () => {
-    if (!confirm("Supprimer les données enregistrées ? Le jeu relira le fichier Excel (data/orientech.xlsx) pour tout le monde.")) return;
+    const source = estV7() ? 'la matrice V7 (data/orientech_v7.json)' : 'le fichier Excel (data/orientech.xlsx)';
+    if (!confirm(`Supprimer les données enregistrées ? Le jeu relira ${source} pour tout le monde.`)) return;
     try {
       await appelAdmin('POST', '/api/admin/donnees/reinitialiser');
       modifie = false; // rechargement voulu : pas d'alerte « modifications non enregistrées »
@@ -422,11 +569,16 @@
   }
 
   // Le métier proposé devient une colonne de la matrice : O → 1, N → -1, questions non choisies → ? (0)
+  // V7 : O → 0.85, N → 0.15, questions non choisies → 0.50
   async function ajouterAuJeu(c) {
     const id = ('P' + c.id).slice(0, 12);
     if (base.metiers[id]) return opts.toast('Ce métier est déjà dans le jeu');
     base.metiers[id] = clone(c.metier);
-    base.questions.forEach((q) => (q.profils[id] = c.reponses[q.id] === 'O' ? 1 : c.reponses[q.id] === 'N' ? -1 : 0));
+    base.questions.forEach((q) => {
+      const r = c.reponses[q.id];
+      if (estV7()) q.p[id] = r === 'O' ? 0.85 : r === 'N' ? 0.15 : 0.5;
+      else q.profils[id] = r === 'O' ? 1 : r === 'N' ? -1 : 0;
+    });
     marquer();
     await changerStatut(c, 'acceptee');
     opts.toast(`« ${c.metier.nom} » ajouté : clique sur Enregistrer pour le publier`);
@@ -439,6 +591,8 @@
     if (!original) original = clone({ metiers: b.metiers, questions: b.questions });
     if (!base.metiers[ficheSel]) ficheSel = idsMetiers()[0] || null;
     if (!noeud(noeudSel)) noeudSel = base.questions[0] ? base.questions[0].id : null;
+    $('aExporterV7').classList.toggle('hidden', !estV7());
+    $('aReinitialiser').lastChild.textContent = estV7() ? 'Revenir au JSON V7' : "Revenir à l'Excel";
     changerOnglet(['fiches', 'noeuds', 'matrice', 'contributions'].includes(options.onglet) ? options.onglet : onglet);
   }
 
