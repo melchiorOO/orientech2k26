@@ -113,11 +113,20 @@
     const tous = slots();
     if (etape < tous.length) {
       if (tous[etape].dataset.etat === 'verrouille') tous[etape].dataset.etat = 'pret';
+      // téléphone (coffres empilés) : on amène le coffre suivant à l'écran s'il n'y est pas en entier
+      const r = tous[etape].getBoundingClientRect();
+      if (!instantane && (r.top < 0 || r.bottom > innerHeight)) {
+        tous[etape].scrollIntoView({ behavior: mouvementReduit() ? 'auto' : 'smooth', block: 'center' });
+      }
       return;
     }
     $('cConsigne').textContent = 'Bravo, tout est révélé !';
     $('cPasser').classList.add('hidden');
-    timers.push(setTimeout(() => $('cFin').classList.remove('hidden'), instantane ? 0 : 500));
+    timers.push(setTimeout(() => {
+      $('cFin').classList.remove('hidden');
+      const r = $('cFin').getBoundingClientRect();
+      if (!instantane && r.bottom > innerHeight) $('cFin').scrollIntoView({ behavior: mouvementReduit() ? 'auto' : 'smooth', block: 'end' });
+    }, instantane ? 0 : 500));
   }
 
   // "Passer" : ouvre d'un coup tous les coffres restants (sans animation)
